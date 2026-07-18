@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The UPI QR — Premium Payment Card Generator</title>
+    <meta name="description" content="Generate and share premium, high-resolution UPI QR payment cards formatted in the Indian numbering system.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icons (Lucide Icons via ESM) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- QRCode library -->
+    <script src="qrcode.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="glow-bg"></div>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header animate-fade-in">
+            <div class="logo">
+                <i data-lucide="qr-code" class="logo-icon"></i>
+                <h1>THE <span class="gradient-text">UPI QR</span></h1>
+            </div>
+            <p class="subtitle">Generate custom glassmorphic payment cards in real time</p>
+        </header>
+
+        <main class="app-content">
+            <!-- Left: Controls Panel -->
+            <section class="control-panel card glass animate-slide-up">
+                <h2 class="section-title"><i data-lucide="sliders" class="icon"></i> Card Details</h2>
+                
+                <form id="qr-form" onsubmit="event.preventDefault();">
+                    <!-- Payee Name -->
+                    <div class="form-group">
+                        <label for="payee-name">Payee Name</label>
+                        <div class="input-wrapper">
+                            <i data-lucide="user" class="input-icon"></i>
+                            <input type="text" id="payee-name" placeholder="e.g. Aditya Sharma" autocomplete="off" required>
+                        </div>
+                    </div>
+
+                    <!-- UPI ID (Username + Handle) -->
+                    <div class="form-group">
+                        <label for="upi-username">UPI ID (VPA)</label>
+                        <div class="upi-input-group">
+                            <div class="input-wrapper username-wrapper">
+                                <i data-lucide="at-sign" class="input-icon"></i>
+                                <input type="text" id="upi-username" placeholder="username" autocomplete="off" required>
+                            </div>
+                            <div class="custom-select-container">
+                                <div class="custom-select-trigger" id="handle-select-trigger">
+                                    <span id="selected-handle-text">@okhdfcbank</span>
+                                    <i data-lucide="chevron-down" class="chevron-icon"></i>
+                                </div>
+                                <div class="custom-select-options" id="handle-select-options">
+                                    <!-- Options will be populated by JS -->
+                                </div>
+                            </div>
+                        </div>
+                        <span class="helper-text">VPA handle: <strong id="vpa-preview-text">username@okhdfcbank</strong></span>
+                    </div>
+
+                    <!-- Amount Toggle & Input -->
+                    <div class="form-group">
+                        <div class="toggle-group">
+                            <label for="amount-toggle">Specify Amount</label>
+                            <label class="switch">
+                                <input type="checkbox" id="amount-toggle" checked>
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+
+                        <div id="amount-input-container" class="amount-container animate-expand">
+                            <div class="input-wrapper amount-wrapper">
+                                <span class="currency-symbol">₹</span>
+                                <input type="text" id="amount" placeholder="0.00" autocomplete="off">
+                            </div>
+                            <div class="formatted-amount-row">
+                                <span id="indian-formatted-amount" class="formatted-badge">₹ 0.00</span>
+                                <span id="indian-words-amount" class="words-badge">Zero Rupees Only</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Note / Description -->
+                    <div class="form-group">
+                        <label for="note">Transaction Note <span class="optional">(Optional)</span></label>
+                        <div class="input-wrapper">
+                            <i data-lucide="message-square" class="input-icon"></i>
+                            <input type="text" id="note" placeholder="e.g. Rent, Dinner, Coffee" autocomplete="off" maxlength="25">
+                        </div>
+                    </div>
+
+                    <!-- Card Style Theme Picker -->
+                    <div class="form-group">
+                        <label>Card Theme</label>
+                        <div class="theme-picker">
+                            <button type="button" class="theme-btn active" data-theme="dark-metallic" style="background: linear-gradient(135deg, #1f1f2e, #0f0f15);">
+                                <span class="theme-name">Midnight Metallic</span>
+                            </button>
+                            <button type="button" class="theme-btn" data-theme="neon-violet" style="background: linear-gradient(135deg, #4f46e5, #06b6d4);">
+                                <span class="theme-name">Cyberpunk Neon</span>
+                            </button>
+                            <button type="button" class="theme-btn" data-theme="emerald-glow" style="background: linear-gradient(135deg, #064e3b, #10b981);">
+                                <span class="theme-name">Emerald Mint</span>
+                            </button>
+                            <button type="button" class="theme-btn" data-theme="rose-gold" style="background: linear-gradient(135deg, #501d2d, #f43f5e);">
+                                <span class="theme-name">Rose Gold Glass</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Right: Preview & Output Panel -->
+            <section class="preview-panel animate-slide-up">
+                <div class="phone-mockup">
+                    <div class="phone-speaker"></div>
+                    <div class="phone-screen">
+                        <div class="preview-header">
+                            <i data-lucide="wifi" class="icon-small"></i>
+                            <span class="preview-time">09:41</span>
+                            <i data-lucide="battery" class="icon-small"></i>
+                        </div>
+                        
+                        <div class="preview-content">
+                            <!-- Premium 3:4 Payment Card -->
+                            <div class="payment-card-wrapper">
+                                <canvas id="payment-card-canvas" width="600" height="800"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Triggers -->
+                <div class="action-buttons-group">
+                    <button id="btn-share" class="btn btn-primary">
+                        <i data-lucide="share-2" class="btn-icon"></i>
+                        Share Card
+                    </button>
+                    <button id="btn-download" class="btn btn-secondary">
+                        <i data-lucide="download" class="btn-icon"></i>
+                        Download JPG
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Made securely in India. The UPI QR does not store or transmit any of your personal payment details.</p>
+        </footer>
+    </div>
+
+    <!-- Hidden resolution canvas for high-quality export -->
+    <canvas id="export-canvas" width="1200" height="1600" style="display: none;"></canvas>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
