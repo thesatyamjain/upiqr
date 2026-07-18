@@ -22,7 +22,7 @@
         <!-- Header -->
         <header class="app-header animate-fade-in">
             <div class="logo">
-                <i data-lucide="qr-code" class="logo-icon"></i>
+                <img src="favicon.svg" class="logo-icon" alt="" aria-hidden="true">
                 <h1><span class="gradient-text">UPI QR</span></h1>
             </div>
         </header>
@@ -68,26 +68,20 @@
                         <span class="helper-text">VPA handle: <strong id="vpa-preview-text">—</strong></span>
                     </div>
 
-                    <!-- Amount Toggle & Input -->
+                    <!-- Amount -->
                     <div class="form-group">
-                        <div class="toggle-group">
-                            <label for="amount-toggle">Specify Amount</label>
-                            <label class="switch">
-                                <input type="checkbox" id="amount-toggle" checked>
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
-
-                        <div id="amount-input-container" class="amount-container animate-expand">
+                        <label for="amount">Amount <span class="optional">(Optional)</span></label>
+                        <div id="amount-input-container" class="amount-container">
                             <div class="input-wrapper amount-wrapper">
                                 <span class="currency-symbol">₹</span>
-                                <input type="text" id="amount" autocomplete="off">
+                                <input type="text" id="amount" autocomplete="off" aria-describedby="amount-limit">
                             </div>
                             <div class="formatted-amount-row">
                                 <span id="indian-formatted-amount" class="formatted-badge">₹ 0.00</span>
                                 <span id="indian-words-amount" class="words-badge">Zero Rupees Only</span>
                             </div>
                         </div>
+                        <span id="amount-limit" class="helper-text amount-limit">Standard personal UPI limit: up to ₹1,00,000 per transaction. Your bank or UPI app may set a lower limit.</span>
                     </div>
 
                     <!-- Note / Description -->
@@ -105,17 +99,17 @@
                     <div class="form-group">
                         <label>Card Theme</label>
                         <div class="theme-picker">
-                            <button type="button" class="theme-btn active" data-theme="dark-metallic" style="background: linear-gradient(135deg, #1f1f2e, #0f0f15);">
-                                <span class="theme-name">Midnight Metallic</span>
+                            <button type="button" class="theme-btn active" data-theme="dark-metallic" style="background: linear-gradient(135deg, #14213d, #070d1b);">
+                                <span class="theme-name">Deep Navy</span>
                             </button>
-                            <button type="button" class="theme-btn" data-theme="neon-violet" style="background: linear-gradient(135deg, #4f46e5, #06b6d4);">
-                                <span class="theme-name">Cyberpunk Neon</span>
+                            <button type="button" class="theme-btn" data-theme="neon-violet" style="background: linear-gradient(135deg, #312e81, #7c3aed);">
+                                <span class="theme-name">Royal Violet</span>
                             </button>
-                            <button type="button" class="theme-btn" data-theme="emerald-glow" style="background: linear-gradient(135deg, #064e3b, #10b981);">
-                                <span class="theme-name">Emerald Mint</span>
+                            <button type="button" class="theme-btn" data-theme="emerald-glow" style="background: linear-gradient(135deg, #0c5b4d, #18a982);">
+                                <span class="theme-name">Bharat Green</span>
                             </button>
-                            <button type="button" class="theme-btn" data-theme="rose-gold" style="background: linear-gradient(135deg, #501d2d, #f43f5e);">
-                                <span class="theme-name">Rose Gold Glass</span>
+                            <button type="button" class="theme-btn" data-theme="rose-gold" style="background: linear-gradient(135deg, #b54728, #f5a524);">
+                                <span class="theme-name">Saffron Glow</span>
                             </button>
                         </div>
                     </div>

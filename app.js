@@ -21,48 +21,48 @@ const BANK_HANDLES = [
 // Theme configurations
 const THEMES = {
     "dark-metallic": {
-        bgStart: "#1f1f2e",
-        bgEnd: "#0a0a0f",
-        cardBg: "rgba(25, 25, 35, 0.6)",
-        accent: "#a78bfa",
-        accentLight: "#c084fc",
+        bgStart: "#14213d",
+        bgEnd: "#070d1b",
+        cardBg: "rgba(255, 255, 255, 0.05)",
+        accent: "#6ea8fe",
+        accentLight: "#9bc1ff",
         textMain: "#ffffff",
-        textSub: "#94a3b8",
+        textSub: "#a7b6cf",
         glassBorder: "rgba(255, 255, 255, 0.08)",
-        qrDark: "#0d0d15"
+        qrDark: "#0b1730"
     },
     "neon-violet": {
-        bgStart: "#4f46e5",
-        bgEnd: "#0f0b29",
-        cardBg: "rgba(20, 15, 45, 0.55)",
-        accent: "#06b6d4",
-        accentLight: "#22d3ee",
+        bgStart: "#312e81",
+        bgEnd: "#12113a",
+        cardBg: "rgba(255, 255, 255, 0.07)",
+        accent: "#a78bfa",
+        accentLight: "#c4b5fd",
         textMain: "#ffffff",
-        textSub: "#cbd5e1",
+        textSub: "#d8d3ff",
         glassBorder: "rgba(255, 255, 255, 0.12)",
-        qrDark: "#080612"
+        qrDark: "#231f58"
     },
     "emerald-glow": {
-        bgStart: "#064e3b",
-        bgEnd: "#021c15",
-        cardBg: "rgba(10, 35, 25, 0.6)",
-        accent: "#10b981",
-        accentLight: "#34d399",
+        bgStart: "#0c5b4d",
+        bgEnd: "#062b28",
+        cardBg: "rgba(255, 255, 255, 0.06)",
+        accent: "#57d6b3",
+        accentLight: "#8ce9ce",
         textMain: "#ffffff",
-        textSub: "#a7f3d0",
+        textSub: "#b9eadc",
         glassBorder: "rgba(255, 255, 255, 0.09)",
-        qrDark: "#020f0b"
+        qrDark: "#073c35"
     },
     "rose-gold": {
-        bgStart: "#501d2d",
-        bgEnd: "#14050a",
-        cardBg: "rgba(35, 15, 20, 0.6)",
-        accent: "#f43f5e",
-        accentLight: "#fb7185",
+        bgStart: "#b54728",
+        bgEnd: "#4a1721",
+        cardBg: "rgba(255, 255, 255, 0.07)",
+        accent: "#ffcb77",
+        accentLight: "#ffe0a8",
         textMain: "#ffffff",
-        textSub: "#fecdd3",
+        textSub: "#ffe1c4",
         glassBorder: "rgba(255, 255, 255, 0.1)",
-        qrDark: "#100206"
+        qrDark: "#571d1a"
     }
 };
 
@@ -71,15 +71,16 @@ let state = {
     payeeName: "",
     username: "",
     handle: "@okhdfcbank",
-    amountEnabled: true,
     amount: "",
     note: "",
     theme: "dark-metallic"
 };
 
 const STORAGE_KEY = "upi-qr-card-details-v1";
+const STANDARD_UPI_TRANSACTION_LIMIT = 100000;
 let renderVersion = 0;
 let latestRenderPromise = Promise.resolve();
+let amountLimitFeedbackTimer;
 
 function loadSavedState() {
     try {
@@ -91,7 +92,6 @@ function loadSavedState() {
             ...state,
             payeeName: typeof savedState.payeeName === "string" ? savedState.payeeName : state.payeeName,
             username: typeof savedState.username === "string" ? savedState.username : state.username,
-            amountEnabled: typeof savedState.amountEnabled === "boolean" ? savedState.amountEnabled : state.amountEnabled,
             amount: typeof savedState.amount === "string" ? savedState.amount : state.amount,
             note: typeof savedState.note === "string" ? savedState.note : state.note,
             theme: THEMES[savedState.theme] ? savedState.theme : state.theme,
@@ -109,7 +109,6 @@ function saveState() {
             payeeName: state.payeeName,
             username: state.username,
             handle: state.handle,
-            amountEnabled: state.amountEnabled,
             amount: state.amount,
             note: state.note,
             theme: state.theme
@@ -126,9 +125,8 @@ const handleSelectTrigger = document.getElementById("handle-select-trigger");
 const handleSelectOptions = document.getElementById("handle-select-options");
 const selectedHandleText = document.getElementById("selected-handle-text");
 const vpaPreviewText = document.getElementById("vpa-preview-text");
-const amountToggle = document.getElementById("amount-toggle");
-const amountInputContainer = document.getElementById("amount-input-container");
 const amountInput = document.getElementById("amount");
+const amountLimitText = document.getElementById("amount-limit");
 const formattedAmountText = document.getElementById("indian-formatted-amount");
 const wordsAmountText = document.getElementById("indian-words-amount");
 const noteInput = document.getElementById("note");
@@ -217,6 +215,21 @@ function formatIndianAmountInput(value) {
     return decimalPart === undefined ? groupedWholePart : `${groupedWholePart}.${decimalPart}`;
 }
 
+function showAmountLimitFeedback() {
+    const inputWrapper = amountInput.closest(".input-wrapper");
+    inputWrapper.classList.remove("limit-reached");
+    amountLimitText.classList.remove("limit-reached");
+    // Reflow lets the animation play again on each blocked keystroke or paste.
+    void inputWrapper.offsetWidth;
+    inputWrapper.classList.add("limit-reached");
+    amountLimitText.classList.add("limit-reached");
+    clearTimeout(amountLimitFeedbackTimer);
+    amountLimitFeedbackTimer = setTimeout(() => {
+        inputWrapper.classList.remove("limit-reached");
+        amountLimitText.classList.remove("limit-reached");
+    }, 700);
+}
+
 // Check VPA validity constraints (must contain only alphanumeric, dots, and hyphens)
 function validateVPAUsername(val) {
     const upiRegex = /^[a-zA-Z0-9.\-_]{2,64}$/;
@@ -226,6 +239,10 @@ function validateVPAUsername(val) {
 function getPaymentValidationError() {
     if (!state.payeeName.trim()) return "Enter the payee name before exporting.";
     if (!validateVPAUsername(state.username)) return "Enter a valid UPI ID username (2–64 letters, numbers, dots, hyphens, or underscores).";
+    const amount = Number.parseFloat(state.amount);
+    if (Number.isFinite(amount) && amount > STANDARD_UPI_TRANSACTION_LIMIT) {
+        return "Standard personal UPI payments are limited to ₹1,00,000 per transaction. Your bank may set a lower limit.";
+    }
     return "";
 }
 
@@ -234,7 +251,7 @@ function buildUpiUri(data) {
     let uri = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(data.payeeName.trim())}&cu=INR`;
     const amount = Number.parseFloat(data.amount);
 
-    if (data.amountEnabled && Number.isFinite(amount) && amount > 0) {
+    if (Number.isFinite(amount) && amount > 0) {
         uri += `&am=${amount.toFixed(2)}`;
     }
     if (data.note.trim()) {
@@ -373,43 +390,27 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
     
-    // 4. Draw Header SCAN & PAY Title & official NPCI format look
+    // 4. Draw compact header
     ctx.save();
-    ctx.font = `800 ${24 * scale}px 'Outfit', sans-serif`;
+    ctx.font = `800 ${22 * scale}px 'Outfit', sans-serif`;
     ctx.fillStyle = theme.textMain;
-    ctx.letterSpacing = "2px";
+    ctx.letterSpacing = "1px";
     ctx.textAlign = "center";
-    ctx.fillText("SCAN & PAY", w / 2, 60 * scale);
+    ctx.fillText("UPI QR", w / 2, 54 * scale);
     
-    ctx.font = `600 ${11 * scale}px 'Inter', sans-serif`;
+    ctx.font = `600 ${10 * scale}px 'Inter', sans-serif`;
     ctx.fillStyle = theme.accent;
-    ctx.fillText("SECURE UPI TRANSACTION", w / 2, 82 * scale);
+    ctx.fillText("SCAN & PAY USING ANY UPI APP", w / 2, 76 * scale);
     ctx.restore();
     
-    // 5. Draw QR code central glassmorphic container
-    const qrContainerSize = 340 * scale;
-    const qrContainerX = (w - qrContainerSize) / 2;
-    const qrContainerY = 150 * scale;
-    const qrContainerRadius = 24 * scale;
-    
-    ctx.save();
-    // Blur simulation: draw glassmorphic background card
-    ctx.fillStyle = theme.cardBg;
-    ctx.strokeStyle = theme.glassBorder;
-    ctx.lineWidth = 1.5 * scale;
-    drawRoundedRect(ctx, qrContainerX, qrContainerY, qrContainerSize, qrContainerSize, qrContainerRadius);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-    
-    // 6. Draw QR Code dynamic image representation
+    // 5. Draw QR Code dynamic image representation
     // UPI payment URI string construction
     // e.g. upi://pay?pa=username@handle&pn=PayeeName&am=Amount&tn=Note
     const { uri: upiString, vpa } = buildUpiUri(data);
     
     // Generate QR using temporary hidden canvas to get high quality data
     const tempCanvas = document.createElement("canvas");
-    const qrSizePixel = 266 * scale;
+    const qrSizePixel = 344 * scale;
     
     await new Promise((resolve, reject) => {
         QRCode.toCanvas(tempCanvas, upiString, {
@@ -428,14 +429,14 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
 
     if (version !== renderVersion) return;
     
-    // Draw white background inside glass block behind QR code
-    const qrBoxSize = 282 * scale;
+    // A single, generous high-contrast QR surface keeps the card easy to scan.
+    const qrBoxSize = 380 * scale;
     const qrBoxX = (w - qrBoxSize) / 2;
-    const qrBoxY = qrContainerY + (qrContainerSize - qrBoxSize) / 2;
+    const qrBoxY = 112 * scale;
     
     ctx.save();
     ctx.fillStyle = "#ffffff";
-    drawRoundedRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 14 * scale);
+    drawRoundedRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 18 * scale);
     ctx.fill();
     
     // Render QR Code onto main card canvas
@@ -444,8 +445,8 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     ctx.drawImage(tempCanvas, qrImgX, qrImgY, qrSizePixel, qrSizePixel);
     ctx.restore();
     
-    // 7. Draw payee details (Name & VPA id)
-    const infoYStart = qrContainerY + qrContainerSize + 30 * scale;
+    // 6. Draw payee details directly beneath the QR code
+    const infoYStart = qrBoxY + qrBoxSize + 52 * scale;
     const infoX = 70 * scale;
     let contentBottom = infoYStart + 22 * scale;
     
@@ -473,7 +474,7 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     ctx.restore();
     
     // 8. Draw Amount if specified
-    if (data.amountEnabled && data.amount) {
+    if (Number.isFinite(Number.parseFloat(data.amount)) && Number.parseFloat(data.amount) > 0) {
         const amountY = infoYStart + 78 * scale;
         const formatted = formatIndianCurrency(data.amount);
         const words = numberToIndianWords(data.amount);
@@ -525,16 +526,13 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
         ctx.restore();
     }
     
-    // 10. Draw Footer guidance and security stamp at the bottom
+    // 10. Draw a minimal security stamp at the bottom
     ctx.save();
     ctx.textAlign = "center";
-    ctx.font = `600 ${10 * scale}px 'Inter', sans-serif`;
-    ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-    ctx.fillText("SCAN WITH ANY BHIM UPI APP", w / 2, h - 58 * scale);
     ctx.font = `600 ${9 * scale}px 'Inter', sans-serif`;
     ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
     ctx.letterSpacing = "1.5px";
-    ctx.fillText("POWERED BY BHIM UPI SYSTEM • SECURE LINK", w / 2, h - 35 * scale);
+    ctx.fillText("POWERED BY NPCI UPI", w / 2, h - 35 * scale);
     ctx.restore();
 
     if (version !== renderVersion) return;
@@ -611,31 +609,6 @@ function setupEventListeners() {
         updateCard();
     });
     
-    // Amount Toggle Switch
-    amountToggle.checked = state.amountEnabled;
-    if (!state.amountEnabled) {
-        amountInputContainer.style.display = "none";
-        amountInputContainer.style.opacity = "0";
-        amountInputContainer.style.transform = "scaleY(0.8)";
-    }
-    amountToggle.addEventListener("change", (e) => {
-        state.amountEnabled = e.target.checked;
-        if (state.amountEnabled) {
-            amountInputContainer.style.display = "flex";
-            setTimeout(() => {
-                amountInputContainer.style.opacity = "1";
-                amountInputContainer.style.transform = "scaleY(1)";
-            }, 10);
-        } else {
-            amountInputContainer.style.opacity = "0";
-            amountInputContainer.style.transform = "scaleY(0.8)";
-            setTimeout(() => {
-                amountInputContainer.style.display = "none";
-            }, 200);
-        }
-        updateCard();
-    });
-    
     // Amount Value Text Input
     amountInput.value = formatIndianAmountInput(state.amount);
     
@@ -660,9 +633,20 @@ function setupEventListeners() {
                 cleanVal = `${parts[0]}.${parts[1].substr(0, 2)}`;
             }
         }
+
+        // Reject input beyond the standard personal UPI ₹1 lakh limit and
+        // preserve the last valid value instead of silently changing it.
+        if (Number.parseFloat(cleanVal) > STANDARD_UPI_TRANSACTION_LIMIT) {
+            amountInput.value = formatIndianAmountInput(state.amount);
+            showAmountLimitFeedback();
+            return;
+        }
         
         amountInput.value = formatIndianAmountInput(cleanVal);
         state.amount = cleanVal;
+        const exceedsStandardLimit = Number.parseFloat(cleanVal) > STANDARD_UPI_TRANSACTION_LIMIT;
+        amountInput.setCustomValidity(exceedsStandardLimit ? "Standard personal UPI payments are limited to ₹1,00,000 per transaction." : "");
+        amountInput.style.borderColor = exceedsStandardLimit ? "#ef4444" : "";
         
         // Update labels
         formattedAmountText.textContent = formatIndianCurrency(cleanVal);
