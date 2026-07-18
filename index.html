@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The UPI QR — Premium Payment Card Generator</title>
+    <title>UPI QR</title>
     <meta name="description" content="Generate and share premium, high-resolution UPI QR payment cards formatted in the Indian numbering system.">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,15 +22,19 @@
         <header class="app-header animate-fade-in">
             <div class="logo">
                 <i data-lucide="qr-code" class="logo-icon"></i>
-                <h1>THE <span class="gradient-text">UPI QR</span></h1>
+                <h1><span class="gradient-text">UPI QR</span></h1>
             </div>
-            <p class="subtitle">Generate custom glassmorphic payment cards in real time</p>
         </header>
 
         <main class="app-content">
             <!-- Left: Controls Panel -->
             <section class="control-panel card glass animate-slide-up">
-                <h2 class="section-title"><i data-lucide="sliders" class="icon"></i> Card Details</h2>
+                <div class="panel-heading">
+                    <h2 class="section-title"><i data-lucide="sliders" class="icon"></i> Card Details</h2>
+                    <button type="button" id="btn-more" class="more-button" aria-expanded="false" aria-controls="additional-options" aria-label="Show more options" title="More options">
+                        <i data-lucide="more-horizontal" class="btn-icon"></i>
+                    </button>
+                </div>
                 
                 <form id="qr-form" onsubmit="event.preventDefault();">
                     <!-- Payee Name -->
@@ -38,7 +42,7 @@
                         <label for="payee-name">Payee Name</label>
                         <div class="input-wrapper">
                             <i data-lucide="user" class="input-icon"></i>
-                            <input type="text" id="payee-name" placeholder="e.g. Aditya Sharma" autocomplete="off" required>
+                            <input type="text" id="payee-name" autocomplete="off" required>
                         </div>
                     </div>
 
@@ -48,19 +52,19 @@
                         <div class="upi-input-group">
                             <div class="input-wrapper username-wrapper">
                                 <i data-lucide="at-sign" class="input-icon"></i>
-                                <input type="text" id="upi-username" placeholder="username" autocomplete="off" required>
+                                <input type="text" id="upi-username" autocomplete="off" required>
                             </div>
                             <div class="custom-select-container">
-                                <div class="custom-select-trigger" id="handle-select-trigger">
+                                <div class="custom-select-trigger" id="handle-select-trigger" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Choose UPI handle">
                                     <span id="selected-handle-text">@okhdfcbank</span>
                                     <i data-lucide="chevron-down" class="chevron-icon"></i>
                                 </div>
-                                <div class="custom-select-options" id="handle-select-options">
+                                <div class="custom-select-options" id="handle-select-options" role="listbox">
                                     <!-- Options will be populated by JS -->
                                 </div>
                             </div>
                         </div>
-                        <span class="helper-text">VPA handle: <strong id="vpa-preview-text">username@okhdfcbank</strong></span>
+                        <span class="helper-text">VPA handle: <strong id="vpa-preview-text">—</strong></span>
                     </div>
 
                     <!-- Amount Toggle & Input -->
@@ -76,7 +80,7 @@
                         <div id="amount-input-container" class="amount-container animate-expand">
                             <div class="input-wrapper amount-wrapper">
                                 <span class="currency-symbol">₹</span>
-                                <input type="text" id="amount" placeholder="0.00" autocomplete="off">
+                                <input type="text" id="amount" autocomplete="off">
                             </div>
                             <div class="formatted-amount-row">
                                 <span id="indian-formatted-amount" class="formatted-badge">₹ 0.00</span>
@@ -90,10 +94,12 @@
                         <label for="note">Transaction Note <span class="optional">(Optional)</span></label>
                         <div class="input-wrapper">
                             <i data-lucide="message-square" class="input-icon"></i>
-                            <input type="text" id="note" placeholder="e.g. Rent, Dinner, Coffee" autocomplete="off" maxlength="25">
+                            <input type="text" id="note" autocomplete="off" maxlength="25">
                         </div>
                     </div>
 
+                    <!-- Additional options -->
+                    <div id="additional-options" class="additional-options" hidden>
                     <!-- Card Style Theme Picker -->
                     <div class="form-group">
                         <label>Card Theme</label>
@@ -112,27 +118,15 @@
                             </button>
                         </div>
                     </div>
+                    </div>
                 </form>
             </section>
 
             <!-- Right: Preview & Output Panel -->
             <section class="preview-panel animate-slide-up">
-                <div class="phone-mockup">
-                    <div class="phone-speaker"></div>
-                    <div class="phone-screen">
-                        <div class="preview-header">
-                            <i data-lucide="wifi" class="icon-small"></i>
-                            <span class="preview-time">09:41</span>
-                            <i data-lucide="battery" class="icon-small"></i>
-                        </div>
-                        
-                        <div class="preview-content">
-                            <!-- Premium 3:4 Payment Card -->
-                            <div class="payment-card-wrapper">
-                                <canvas id="payment-card-canvas" width="600" height="800"></canvas>
-                            </div>
-                        </div>
-                    </div>
+                <!-- Premium 3:4 Payment Card -->
+                <div class="payment-card-wrapper">
+                    <canvas id="payment-card-canvas" width="600" height="800" role="img" aria-label="Preview of the generated UPI payment card"></canvas>
                 </div>
 
                 <!-- Action Triggers -->
@@ -151,7 +145,7 @@
 
         <!-- Footer -->
         <footer class="app-footer">
-            <p>Made securely in India. The UPI QR does not store or transmit any of your personal payment details.</p>
+            <p>Your details are saved only in this browser for reuse and are never sent to a server.</p>
         </footer>
     </div>
 
@@ -159,7 +153,7 @@
     <canvas id="export-canvas" width="1200" height="1600" style="display: none;"></canvas>
 
     <!-- Toast Notification Container -->
-    <div id="toast-container" class="toast-container"></div>
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
     <script src="app.js"></script>
 </body>

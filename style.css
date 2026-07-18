@@ -179,9 +179,7 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border-color);
-    margin-bottom: 8px;
+    margin: 0;
 }
 
 .section-title .icon {
@@ -246,6 +244,13 @@ body {
     border-color: var(--accent);
     background: rgba(30, 30, 46, 0.6);
     box-shadow: 0 0 15px var(--primary-glow);
+}
+
+button:focus-visible,
+.custom-select-trigger:focus-visible,
+.input-wrapper input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
 }
 
 .input-wrapper input:focus + .input-icon {
@@ -510,6 +515,44 @@ body {
     gap: 10px;
 }
 
+.panel-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.more-button {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    font: 600 0.9rem var(--font-ui);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.more-button:hover,
+.more-button[aria-expanded="true"] {
+    border-color: var(--accent);
+    color: var(--text-primary);
+    background: rgba(139, 92, 246, 0.12);
+}
+
+.additional-options[hidden] {
+    display: none;
+}
+
 .theme-btn {
     border: 1px solid var(--border-color);
     border-radius: var(--input-radius);
@@ -561,74 +604,11 @@ body {
     justify-content: center;
 }
 
-/* Mobile Phone Frame Mockup */
-.phone-mockup {
-    width: 320px;
-    height: 520px;
-    background: #0d0d15;
-    border: 8px solid #202030;
-    border-radius: 40px;
-    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(99, 102, 241, 0.06);
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.phone-speaker {
-    width: 60px;
-    height: 5px;
-    background: #202030;
-    border-radius: 10px;
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
-}
-
-.phone-screen {
-    width: 100%;
-    height: 100%;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    background: radial-gradient(circle at top, #151525, #08080f);
-}
-
-.preview-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    padding: 0 8px;
-    margin-top: 4px;
-}
-
-.preview-time {
-    font-weight: 600;
-    color: var(--text-secondary);
-}
-
-.icon-small {
-    width: 14px;
-    height: 14px;
-}
-
-.preview-content {
-    flex-grow: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 12px 0;
-}
-
 /* payment-card component dimensions */
 .payment-card-wrapper {
-    width: 250px;
-    height: 333.33px; /* Exact 3:4 ratio */
+    width: min(100%, 320px);
+    aspect-ratio: 3 / 4;
+    height: auto;
     border-radius: 16px;
     overflow: hidden;
     position: relative;
@@ -781,5 +761,16 @@ body {
     
     .preview-panel {
         order: -1; /* Render card preview at top on mobile screens */
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
     }
 }

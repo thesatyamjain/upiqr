@@ -68,14 +68,56 @@ const THEMES = {
 
 // State Variables
 let state = {
-    payeeName: "Aditya Sharma",
-    username: "adityasharma",
+    payeeName: "",
+    username: "",
     handle: "@okhdfcbank",
     amountEnabled: true,
-    amount: "150000",
-    note: "Consulting Fee",
+    amount: "",
+    note: "",
     theme: "dark-metallic"
 };
+
+const STORAGE_KEY = "upi-qr-card-details-v1";
+let renderVersion = 0;
+let latestRenderPromise = Promise.resolve();
+
+function loadSavedState() {
+    try {
+        const savedState = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (!savedState || typeof savedState !== "object") return;
+
+        const savedHandleIsValid = BANK_HANDLES.some(({ handle }) => handle === savedState.handle);
+        state = {
+            ...state,
+            payeeName: typeof savedState.payeeName === "string" ? savedState.payeeName : state.payeeName,
+            username: typeof savedState.username === "string" ? savedState.username : state.username,
+            amountEnabled: typeof savedState.amountEnabled === "boolean" ? savedState.amountEnabled : state.amountEnabled,
+            amount: typeof savedState.amount === "string" ? savedState.amount : state.amount,
+            note: typeof savedState.note === "string" ? savedState.note : state.note,
+            theme: THEMES[savedState.theme] ? savedState.theme : state.theme,
+            handle: savedHandleIsValid ? savedState.handle : state.handle
+        };
+    } catch (err) {
+        // Storage can be unavailable in private browsing or blocked contexts.
+        console.warn("Saved UPI details could not be restored:", err);
+    }
+}
+
+function saveState() {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            payeeName: state.payeeName,
+            username: state.username,
+            handle: state.handle,
+            amountEnabled: state.amountEnabled,
+            amount: state.amount,
+            note: state.note,
+            theme: state.theme
+        }));
+    } catch (err) {
+        console.warn("UPI details could not be saved locally:", err);
+    }
+}
 
 // UI Elements
 const payeeInput = document.getElementById("payee-name");
@@ -93,6 +135,8 @@ const noteInput = document.getElementById("note");
 const themeButtons = document.querySelectorAll(".theme-btn");
 const btnShare = document.getElementById("btn-share");
 const btnDownload = document.getElementById("btn-download");
+const btnMore = document.getElementById("btn-more");
+const additionalOptions = document.getElementById("additional-options");
 
 // Toast Notification Function
 function showToast(message, icon = "info") {
@@ -166,10 +210,37 @@ function numberToIndianWords(value) {
     return words + " Only";
 }
 
+function formatIndianAmountInput(value) {
+    if (!value) return "";
+    const [wholePart, decimalPart] = value.split(".");
+    const groupedWholePart = Number(wholePart || 0).toLocaleString("en-IN");
+    return decimalPart === undefined ? groupedWholePart : `${groupedWholePart}.${decimalPart}`;
+}
+
 // Check VPA validity constraints (must contain only alphanumeric, dots, and hyphens)
 function validateVPAUsername(val) {
     const upiRegex = /^[a-zA-Z0-9.\-_]{2,64}$/;
     return upiRegex.test(val);
+}
+
+function getPaymentValidationError() {
+    if (!state.payeeName.trim()) return "Enter the payee name before exporting.";
+    if (!validateVPAUsername(state.username)) return "Enter a valid UPI ID username (2–64 letters, numbers, dots, hyphens, or underscores).";
+    return "";
+}
+
+function buildUpiUri(data) {
+    const vpa = `${data.username}${data.handle}`;
+    let uri = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(data.payeeName.trim())}&cu=INR`;
+    const amount = Number.parseFloat(data.amount);
+
+    if (data.amountEnabled && Number.isFinite(amount) && amount > 0) {
+        uri += `&am=${amount.toFixed(2)}`;
+    }
+    if (data.note.trim()) {
+        uri += `&tn=${encodeURIComponent(data.note.trim())}`;
+    }
+    return { uri, vpa };
 }
 
 // --------------------------------------------------------------------------
@@ -180,6 +251,8 @@ function initHandleDropdown() {
     BANK_HANDLES.forEach(item => {
         const option = document.createElement("div");
         option.className = "custom-option";
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", String(item.handle === state.handle));
         if (item.handle === state.handle) option.classList.add("selected");
         
         option.innerHTML = `
@@ -190,11 +263,13 @@ function initHandleDropdown() {
         option.addEventListener("click", () => {
             state.handle = item.handle;
             selectedHandleText.textContent = item.handle;
-            vpaPreviewText.textContent = `${state.username}${state.handle}`;
+            vpaPreviewText.textContent = state.username ? `${state.username}${state.handle}` : "—";
             
             // Highlight active selection
             document.querySelectorAll(".custom-option").forEach(el => el.classList.remove("selected"));
+            document.querySelectorAll(".custom-option").forEach(el => el.setAttribute("aria-selected", "false"));
             option.classList.add("selected");
+            option.setAttribute("aria-selected", "true");
             
             handleSelectContainerClose();
             updateCard();
@@ -206,10 +281,12 @@ function initHandleDropdown() {
 
 function handleSelectContainerClose() {
     document.querySelector(".custom-select-container").classList.remove("open");
+    handleSelectTrigger.setAttribute("aria-expanded", "false");
 }
 
 function handleSelectContainerToggle() {
-    document.querySelector(".custom-select-container").classList.toggle("open");
+    const isOpen = document.querySelector(".custom-select-container").classList.toggle("open");
+    handleSelectTrigger.setAttribute("aria-expanded", String(isOpen));
 }
 
 // Close selector if clicking outside
@@ -223,6 +300,15 @@ window.addEventListener("click", (e) => {
 handleSelectTrigger.addEventListener("click", (e) => {
     e.stopPropagation();
     handleSelectContainerToggle();
+});
+
+handleSelectTrigger.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        handleSelectContainerToggle();
+    } else if (e.key === "Escape") {
+        handleSelectContainerClose();
+    }
 });
 
 // --------------------------------------------------------------------------
@@ -247,9 +333,14 @@ function drawRoundedRect(ctx, x, y, w, h, r) {
 }
 
 // Centralized dynamic drawing subroutine
-async function renderCardOnCanvas(canvas, scale = 1) {
-    const ctx = canvas.getContext("2d");
-    const theme = THEMES[state.theme];
+async function renderCardOnCanvas(canvas, scale, data, version) {
+    // Render off-screen so a stale asynchronous QR generation cannot partially
+    // overwrite a newer card.
+    const stagingCanvas = document.createElement("canvas");
+    stagingCanvas.width = canvas.width;
+    stagingCanvas.height = canvas.height;
+    const ctx = stagingCanvas.getContext("2d");
+    const theme = THEMES[data.theme];
     
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -296,9 +387,9 @@ async function renderCardOnCanvas(canvas, scale = 1) {
     ctx.restore();
     
     // 5. Draw QR code central glassmorphic container
-    const qrContainerSize = 310 * scale;
+    const qrContainerSize = 340 * scale;
     const qrContainerX = (w - qrContainerSize) / 2;
-    const qrContainerY = 115 * scale;
+    const qrContainerY = 150 * scale;
     const qrContainerRadius = 24 * scale;
     
     ctx.save();
@@ -314,21 +405,13 @@ async function renderCardOnCanvas(canvas, scale = 1) {
     // 6. Draw QR Code dynamic image representation
     // UPI payment URI string construction
     // e.g. upi://pay?pa=username@handle&pn=PayeeName&am=Amount&tn=Note
-    const cleanPayee = encodeURIComponent(state.payeeName);
-    const vpa = `${state.username}${state.handle}`;
-    let upiString = `upi://pay?pa=${vpa}&pn=${cleanPayee}`;
-    if (state.amountEnabled && state.amount) {
-        upiString += `&am=${parseFloat(state.amount).toFixed(2)}`;
-    }
-    if (state.note) {
-        upiString += `&tn=${encodeURIComponent(state.note)}`;
-    }
+    const { uri: upiString, vpa } = buildUpiUri(data);
     
     // Generate QR using temporary hidden canvas to get high quality data
     const tempCanvas = document.createElement("canvas");
-    const qrSizePixel = 240 * scale;
+    const qrSizePixel = 266 * scale;
     
-    await new Promise((resolve) => {
+    await new Promise((resolve, reject) => {
         QRCode.toCanvas(tempCanvas, upiString, {
             width: qrSizePixel,
             margin: 0,
@@ -337,13 +420,16 @@ async function renderCardOnCanvas(canvas, scale = 1) {
                 light: "#ffffff"
             },
             errorCorrectionLevel: 'H'
-        }, () => {
-            resolve();
+        }, (err) => {
+            if (err) reject(err);
+            else resolve();
         });
     });
+
+    if (version !== renderVersion) return;
     
     // Draw white background inside glass block behind QR code
-    const qrBoxSize = 256 * scale;
+    const qrBoxSize = 282 * scale;
     const qrBoxX = (w - qrBoxSize) / 2;
     const qrBoxY = qrContainerY + (qrContainerSize - qrBoxSize) / 2;
     
@@ -360,26 +446,37 @@ async function renderCardOnCanvas(canvas, scale = 1) {
     
     // 7. Draw payee details (Name & VPA id)
     const infoYStart = qrContainerY + qrContainerSize + 30 * scale;
+    const infoX = 70 * scale;
+    let contentBottom = infoYStart + 22 * scale;
     
     ctx.save();
-    ctx.textAlign = "center";
+    ctx.textAlign = "left";
+
+    // A small label gives the payment details a clear visual hierarchy.
+    ctx.font = `700 ${10 * scale}px 'Inter', sans-serif`;
+    ctx.fillStyle = theme.textSub;
+    ctx.fillText("PAY TO", infoX, infoYStart - 32 * scale);
     
     // Draw Name
     ctx.font = `700 ${22 * scale}px 'Outfit', sans-serif`;
     ctx.fillStyle = theme.textMain;
-    ctx.fillText(state.payeeName || "Payee Name", w / 2, infoYStart);
+    if (data.payeeName) {
+        ctx.fillText(data.payeeName, infoX, infoYStart);
+    }
     
     // Draw VPA
     ctx.font = `500 ${14 * scale}px 'JetBrains Mono', monospace`;
     ctx.fillStyle = theme.textSub;
-    ctx.fillText(vpa, w / 2, infoYStart + 22 * scale);
+    if (data.username) {
+        ctx.fillText(vpa, infoX, infoYStart + 22 * scale);
+    }
     ctx.restore();
     
     // 8. Draw Amount if specified
-    if (state.amountEnabled && state.amount) {
-        const amountY = infoYStart + 64 * scale;
-        const formatted = formatIndianCurrency(state.amount);
-        const words = numberToIndianWords(state.amount);
+    if (data.amountEnabled && data.amount) {
+        const amountY = infoYStart + 78 * scale;
+        const formatted = formatIndianCurrency(data.amount);
+        const words = numberToIndianWords(data.amount);
         
         ctx.save();
         ctx.textAlign = "center";
@@ -410,11 +507,12 @@ async function renderCardOnCanvas(canvas, scale = 1) {
         }
         ctx.fillText(wordsDisplay, w / 2, amountY + 28 * scale);
         ctx.restore();
+        contentBottom = amountY + 35 * scale;
     }
     
     // 9. Draw Note / Description if present
-    if (state.note) {
-        const noteY = h - 75 * scale;
+    if (data.note) {
+        const noteY = contentBottom + 42 * scale;
         ctx.save();
         ctx.textAlign = "center";
         ctx.font = `600 ${11 * scale}px 'Inter', sans-serif`;
@@ -423,18 +521,26 @@ async function renderCardOnCanvas(canvas, scale = 1) {
         
         // Draw a tiny subtle dot or label before note
         ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
-        ctx.fillText(`NOTE: "${state.note.toUpperCase()}"`, w / 2, noteY);
+        ctx.fillText(`NOTE: "${data.note.toUpperCase()}"`, w / 2, noteY);
         ctx.restore();
     }
     
-    // 10. Draw Footer security stamp at bottom
+    // 10. Draw Footer guidance and security stamp at the bottom
     ctx.save();
     ctx.textAlign = "center";
+    ctx.font = `600 ${10 * scale}px 'Inter', sans-serif`;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+    ctx.fillText("SCAN WITH ANY BHIM UPI APP", w / 2, h - 58 * scale);
     ctx.font = `600 ${9 * scale}px 'Inter', sans-serif`;
     ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
     ctx.letterSpacing = "1.5px";
     ctx.fillText("POWERED BY BHIM UPI SYSTEM • SECURE LINK", w / 2, h - 35 * scale);
     ctx.restore();
+
+    if (version !== renderVersion) return;
+    const targetCtx = canvas.getContext("2d");
+    targetCtx.clearRect(0, 0, canvas.width, canvas.height);
+    targetCtx.drawImage(stagingCanvas, 0, 0);
 }
 
 // Render both preview and export canvas blocks
@@ -442,9 +548,34 @@ function updateCard() {
     const previewCanvas = document.getElementById("payment-card-canvas");
     const exportCanvas = document.getElementById("export-canvas");
     
-    // Async renders
-    renderCardOnCanvas(previewCanvas, 1);
-    renderCardOnCanvas(exportCanvas, 2);
+    const version = ++renderVersion;
+    const data = { ...state };
+    saveState();
+    latestRenderPromise = Promise.all([
+        renderCardOnCanvas(previewCanvas, 1, data, version),
+        renderCardOnCanvas(exportCanvas, 2, data, version)
+    ]);
+    latestRenderPromise.catch((err) => {
+        console.error("Card rendering failed:", err);
+        showToast("Could not generate the QR card. Please shorten the details.", "alert-octagon");
+    });
+    return latestRenderPromise;
+}
+
+function canvasToBlob(canvas, type, quality) {
+    return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Canvas rendering blob failed")), type, quality);
+    });
+}
+
+async function waitForCurrentRender() {
+    // If a user types while a render is pending, wait for the newest version
+    // rather than exporting the last completed canvas.
+    while (true) {
+        const pendingRender = latestRenderPromise;
+        await pendingRender;
+        if (pendingRender === latestRenderPromise) return;
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -454,6 +585,8 @@ function updateCard() {
 function setupEventListeners() {
     // Payee Name Input
     payeeInput.value = state.payeeName;
+    selectedHandleText.textContent = state.handle;
+    vpaPreviewText.textContent = state.username ? `${state.username}${state.handle}` : "—";
     payeeInput.addEventListener("input", (e) => {
         state.payeeName = e.target.value;
         updateCard();
@@ -465,19 +598,26 @@ function setupEventListeners() {
         let val = e.target.value.toLowerCase().replace(/\s+/g, "");
         usernameInput.value = val; // Force clean input
         
+        state.username = val;
         if (validateVPAUsername(val) || val === "") {
-            state.username = val;
             usernameInput.style.borderColor = "";
+            usernameInput.setCustomValidity("");
         } else {
             usernameInput.style.borderColor = "#ef4444";
+            usernameInput.setCustomValidity("Use 2–64 letters, numbers, dots, hyphens, or underscores.");
         }
         
-        vpaPreviewText.textContent = `${state.username}${state.handle}`;
+        vpaPreviewText.textContent = state.username ? `${state.username}${state.handle}` : "—";
         updateCard();
     });
     
     // Amount Toggle Switch
     amountToggle.checked = state.amountEnabled;
+    if (!state.amountEnabled) {
+        amountInputContainer.style.display = "none";
+        amountInputContainer.style.opacity = "0";
+        amountInputContainer.style.transform = "scaleY(0.8)";
+    }
     amountToggle.addEventListener("change", (e) => {
         state.amountEnabled = e.target.checked;
         if (state.amountEnabled) {
@@ -497,7 +637,7 @@ function setupEventListeners() {
     });
     
     // Amount Value Text Input
-    amountInput.value = state.amount;
+    amountInput.value = formatIndianAmountInput(state.amount);
     
     // Perform initial formatting calculations
     formattedAmountText.textContent = formatIndianCurrency(state.amount);
@@ -521,7 +661,7 @@ function setupEventListeners() {
             }
         }
         
-        amountInput.value = cleanVal;
+        amountInput.value = formatIndianAmountInput(cleanVal);
         state.amount = cleanVal;
         
         // Update labels
@@ -538,6 +678,7 @@ function setupEventListeners() {
     });
     
     // Theme buttons selector
+    themeButtons.forEach(btn => btn.classList.toggle("active", btn.dataset.theme === state.theme));
     themeButtons.forEach(btn => {
         btn.addEventListener("click", () => {
             themeButtons.forEach(b => b.classList.remove("active"));
@@ -547,46 +688,63 @@ function setupEventListeners() {
             updateCard();
         });
     });
+
+    btnMore.addEventListener("click", () => {
+        const isExpanded = btnMore.getAttribute("aria-expanded") === "true";
+        btnMore.setAttribute("aria-expanded", String(!isExpanded));
+        additionalOptions.hidden = isExpanded;
+    });
     
     // Download action trigger
-    btnDownload.addEventListener("click", () => {
+    btnDownload.addEventListener("click", async () => {
+        const validationError = getPaymentValidationError();
+        if (validationError) {
+            showToast(validationError, "alert-triangle");
+            return;
+        }
         const exportCanvas = document.getElementById("export-canvas");
-        const dataUrl = exportCanvas.toDataURL("image/jpeg", 0.95);
+        try {
+            await waitForCurrentRender();
+            const dataUrl = exportCanvas.toDataURL("image/jpeg", 0.95);
         
         const link = document.createElement("a");
         const safeName = state.payeeName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
         link.download = `upi_qr_${safeName}.jpg`;
         link.href = dataUrl;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        showToast("Payment card downloaded successfully!", "download");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("Payment card downloaded successfully!", "download");
+        } catch (err) {
+            console.error("Download failed:", err);
+            showToast("Could not download the card. Please try again.", "alert-octagon");
+        }
     });
     
     // Share / Web Share Action trigger
     btnShare.addEventListener("click", async () => {
+        const validationError = getPaymentValidationError();
+        if (validationError) {
+            showToast(validationError, "alert-triangle");
+            return;
+        }
         const exportCanvas = document.getElementById("export-canvas");
         
         try {
-            // Get Blob from export canvas
-            exportCanvas.toBlob(async (blob) => {
-                if (!blob) {
-                    throw new Error("Canvas rendering blob failed");
-                }
-                
-                const safeName = state.payeeName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
-                const file = new File([blob], `upi_qr_${safeName}.jpg`, { type: "image/jpeg" });
+            await waitForCurrentRender();
+            const blob = await canvasToBlob(exportCanvas, "image/jpeg", 0.95);
+            const safeName = state.payeeName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+            const file = new File([blob], `upi_qr_${safeName}.jpg`, { type: "image/jpeg" });
                 
                 // Verify sharing capability in browser
-                if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        files: [file],
-                        title: "UPI QR Payment Card",
-                        text: `Scan to pay ${state.payeeName} securely via UPI.`
-                    });
-                    showToast("Card shared successfully!", "check-circle");
-                } else {
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: "UPI QR Payment Card",
+                    text: `Scan to pay ${state.payeeName} securely via UPI.`
+                });
+                showToast("Card shared successfully!", "check-circle");
+            } else {
                     // Fallback to Clipboard copy + direct download
                     const copyDataUrl = exportCanvas.toDataURL("image/jpeg", 0.9);
                     
@@ -598,9 +756,8 @@ function setupEventListeners() {
                     link.click();
                     document.body.removeChild(link);
                     
-                    showToast("Direct sharing unsupported. Card downloaded!", "alert-triangle");
-                }
-            }, "image/jpeg", 0.95);
+                showToast("Direct sharing unsupported. Card downloaded!", "alert-triangle");
+            }
         } catch (err) {
             console.error("Sharing failed: ", err);
             showToast("Failed to share. Direct download active instead.", "alert-octagon");
@@ -612,6 +769,7 @@ function setupEventListeners() {
 // Initialization Entry Point
 // --------------------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
+    loadSavedState();
     initHandleDropdown();
     setupEventListeners();
     updateCard();
