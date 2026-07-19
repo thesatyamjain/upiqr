@@ -2,9 +2,6 @@
  * THE UPI QR — Core Application Controller
  */
 
-// Initialize lucide icons
-lucide.createIcons();
-
 // Config / Constant Data
 const BANK_HANDLES = [
     { handle: "@okhdfcbank", bank: "HDFC Bank" },
@@ -135,13 +132,20 @@ const btnShare = document.getElementById("btn-share");
 const btnDownload = document.getElementById("btn-download");
 const btnMore = document.getElementById("btn-more");
 const additionalOptions = document.getElementById("additional-options");
+const customSelectContainer = document.querySelector(".custom-select-container");
 
 // Toast Notification Function
 function showToast(message, icon = "info") {
     const container = document.getElementById("toast-container");
     const toast = document.createElement("div");
     toast.className = "toast";
-    toast.innerHTML = `<i data-lucide="${icon}" class="toast-icon"></i> <span>${message}</span>`;
+    const iconEl = document.createElement("i");
+    iconEl.setAttribute("data-lucide", icon);
+    iconEl.className = "toast-icon";
+    const textEl = document.createElement("span");
+    textEl.textContent = message;
+    toast.appendChild(iconEl);
+    toast.appendChild(textEl);
     container.appendChild(toast);
     lucide.createIcons(); // Hydrate the icon
     
@@ -157,20 +161,21 @@ function showToast(message, icon = "info") {
 
 // Format input amount to Indian Currency format (e.g. 150000 -> ₹ 1,50,000.00)
 function formatIndianCurrency(value) {
-    if (!value || isNaN(value)) return "₹ 0.00";
-    
     const formatter = new Intl.NumberFormat("en-IN", {
         style: "currency",
         currency: "INR",
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     });
-    
-    return formatter.format(value);
+
+    const num = parseFloat(value);
+    // Route both empty and zero through the same formatter so output is always consistent
+    return formatter.format(isNaN(num) ? 0 : num);
 }
 
 // Recursively convert numbers to English words in Indian system
 function convertAmount(n) {
+    if (n === 0) return "Zero";
     const units = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
     const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
     
@@ -297,19 +302,18 @@ function initHandleDropdown() {
 }
 
 function handleSelectContainerClose() {
-    document.querySelector(".custom-select-container").classList.remove("open");
+    customSelectContainer.classList.remove("open");
     handleSelectTrigger.setAttribute("aria-expanded", "false");
 }
 
 function handleSelectContainerToggle() {
-    const isOpen = document.querySelector(".custom-select-container").classList.toggle("open");
+    const isOpen = customSelectContainer.classList.toggle("open");
     handleSelectTrigger.setAttribute("aria-expanded", String(isOpen));
 }
 
 // Close selector if clicking outside
 window.addEventListener("click", (e) => {
-    const container = document.querySelector(".custom-select-container");
-    if (!container.contains(e.target)) {
+    if (!customSelectContainer.contains(e.target)) {
         handleSelectContainerClose();
     }
 });
@@ -396,11 +400,11 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     ctx.fillStyle = theme.textMain;
     ctx.letterSpacing = "1px";
     ctx.textAlign = "center";
-    ctx.fillText("UPI QR", w / 2, 54 * scale);
+    ctx.fillText("UPI QR", w / 2, 44 * scale);
     
     ctx.font = `600 ${10 * scale}px 'Inter', sans-serif`;
     ctx.fillStyle = theme.accent;
-    ctx.fillText("SCAN & PAY USING ANY UPI APP", w / 2, 76 * scale);
+    ctx.fillText("SCAN & PAY USING ANY UPI APP", w / 2, 65 * scale);
     ctx.restore();
     
     // 5. Draw QR Code dynamic image representation
@@ -410,7 +414,7 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     
     // Generate QR using temporary hidden canvas to get high quality data
     const tempCanvas = document.createElement("canvas");
-    const qrSizePixel = 344 * scale;
+    const qrSizePixel = 274 * scale;
     
     await new Promise((resolve, reject) => {
         QRCode.toCanvas(tempCanvas, upiString, {
@@ -430,9 +434,9 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     if (version !== renderVersion) return;
     
     // A single, generous high-contrast QR surface keeps the card easy to scan.
-    const qrBoxSize = 380 * scale;
+    const qrBoxSize = 314 * scale;
     const qrBoxX = (w - qrBoxSize) / 2;
-    const qrBoxY = 112 * scale;
+    const qrBoxY = 88 * scale;
     
     ctx.save();
     ctx.fillStyle = "#ffffff";
@@ -444,9 +448,10 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     const qrImgY = qrBoxY + (qrBoxSize - qrSizePixel) / 2;
     ctx.drawImage(tempCanvas, qrImgX, qrImgY, qrSizePixel, qrSizePixel);
     ctx.restore();
+
     
     // 6. Draw payee details directly beneath the QR code
-    const infoYStart = qrBoxY + qrBoxSize + 52 * scale;
+    const infoYStart = qrBoxY + qrBoxSize + 108 * scale;
     const infoX = 70 * scale;
     let contentBottom = infoYStart + 22 * scale;
     
@@ -459,7 +464,7 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     ctx.fillText("PAY TO", infoX, infoYStart - 32 * scale);
     
     // Draw Name
-    ctx.font = `700 ${22 * scale}px 'Outfit', sans-serif`;
+    ctx.font = `700 ${24 * scale}px 'Outfit', sans-serif`;
     ctx.fillStyle = theme.textMain;
     if (data.payeeName) {
         ctx.fillText(data.payeeName, infoX, infoYStart);
@@ -469,13 +474,13 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     ctx.font = `500 ${14 * scale}px 'JetBrains Mono', monospace`;
     ctx.fillStyle = theme.textSub;
     if (data.username) {
-        ctx.fillText(vpa, infoX, infoYStart + 22 * scale);
+        ctx.fillText(vpa, infoX, infoYStart + 26 * scale);
     }
     ctx.restore();
     
     // 8. Draw Amount if specified
     if (Number.isFinite(Number.parseFloat(data.amount)) && Number.parseFloat(data.amount) > 0) {
-        const amountY = infoYStart + 78 * scale;
+        const amountY = infoYStart + 90 * scale;
         const formatted = formatIndianCurrency(data.amount);
         const words = numberToIndianWords(data.amount);
         
@@ -484,16 +489,16 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
         
         // Custom background pill for amount
         ctx.fillStyle = "rgba(255, 255, 255, 0.03)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.07)";
         ctx.lineWidth = 1 * scale;
         const pillWidth = w - 80 * scale;
-        const pillHeight = 65 * scale;
-        drawRoundedRect(ctx, 40 * scale, amountY - 24 * scale, pillWidth, pillHeight, 14 * scale);
+        const pillHeight = 72 * scale;
+        drawRoundedRect(ctx, 40 * scale, amountY - 28 * scale, pillWidth, pillHeight, 14 * scale);
         ctx.fill();
         ctx.stroke();
         
         // Draw amount text
-        ctx.font = `800 ${28 * scale}px 'JetBrains Mono', monospace`;
+        ctx.font = `800 ${30 * scale}px 'JetBrains Mono', monospace`;
         ctx.fillStyle = theme.accentLight;
         ctx.fillText(formatted, w / 2, amountY + 8 * scale);
         
@@ -504,26 +509,25 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
         // Truncate words text if too long
         let wordsDisplay = words;
         if (wordsDisplay.length > 55) {
-            wordsDisplay = wordsDisplay.substr(0, 52) + "...";
+            wordsDisplay = wordsDisplay.slice(0, 52) + "...";
         }
-        ctx.fillText(wordsDisplay, w / 2, amountY + 28 * scale);
+        ctx.fillText(wordsDisplay, w / 2, amountY + 33 * scale);
         ctx.restore();
-        contentBottom = amountY + 35 * scale;
+        contentBottom = amountY + 44 * scale;
     }
     
     // 9. Draw Note / Description if present
+    let lastContentY = contentBottom;
     if (data.note) {
-        const noteY = contentBottom + 42 * scale;
+        const noteY = contentBottom + 52 * scale;
         ctx.save();
         ctx.textAlign = "center";
         ctx.font = `600 ${11 * scale}px 'Inter', sans-serif`;
-        ctx.fillStyle = theme.textSub;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.28)";
         ctx.letterSpacing = "0.5px";
-        
-        // Draw a tiny subtle dot or label before note
-        ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
         ctx.fillText(`NOTE: "${data.note.toUpperCase()}"`, w / 2, noteY);
         ctx.restore();
+        lastContentY = noteY;
     }
     
     // 10. Draw a minimal security stamp at the bottom
@@ -532,7 +536,8 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     ctx.font = `600 ${9 * scale}px 'Inter', sans-serif`;
     ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
     ctx.letterSpacing = "1.5px";
-    ctx.fillText("POWERED BY NPCI UPI", w / 2, h - 35 * scale);
+    ctx.fillText("POWERED BY NPCI UPI", w / 2,
+        Math.min(Math.max(lastContentY + 48 * scale, h * 0.78), h - 28 * scale));
     ctx.restore();
 
     if (version !== renderVersion) return;
@@ -619,18 +624,21 @@ function setupEventListeners() {
     amountInput.addEventListener("input", (e) => {
         // Strip everything except numbers and a single dot
         let cleanVal = e.target.value.replace(/[^0-9.]/g, "");
+
+        // Treat a lone decimal point as empty — no valid number yet
+        if (cleanVal === ".") cleanVal = "";
         
         // Restrict duplicate dots
         const dotCount = (cleanVal.match(/\./g) || []).length;
         if (dotCount > 1) {
-            cleanVal = cleanVal.substr(0, cleanVal.lastIndexOf('.'));
+            cleanVal = cleanVal.slice(0, cleanVal.lastIndexOf('.'));
         }
         
         // Restrict values up to 2 decimal places
         if (cleanVal.includes('.')) {
             const parts = cleanVal.split('.');
             if (parts[1].length > 2) {
-                cleanVal = `${parts[0]}.${parts[1].substr(0, 2)}`;
+                cleanVal = `${parts[0]}.${parts[1].slice(0, 2)}`;
             }
         }
 
@@ -644,9 +652,8 @@ function setupEventListeners() {
         
         amountInput.value = formatIndianAmountInput(cleanVal);
         state.amount = cleanVal;
-        const exceedsStandardLimit = Number.parseFloat(cleanVal) > STANDARD_UPI_TRANSACTION_LIMIT;
-        amountInput.setCustomValidity(exceedsStandardLimit ? "Standard personal UPI payments are limited to ₹1,00,000 per transaction." : "");
-        amountInput.style.borderColor = exceedsStandardLimit ? "#ef4444" : "";
+        amountInput.setCustomValidity("");
+        amountInput.style.borderColor = "";
         
         // Update labels
         formattedAmountText.textContent = formatIndianCurrency(cleanVal);
@@ -655,9 +662,12 @@ function setupEventListeners() {
     });
     
     // Transaction Note input
+    const noteCounter = document.getElementById("note-char-count");
     noteInput.value = state.note;
+    if (noteCounter) noteCounter.textContent = `${state.note.length}/25`;
     noteInput.addEventListener("input", (e) => {
         state.note = e.target.value;
+        if (noteCounter) noteCounter.textContent = `${state.note.length}/25`;
         updateCard();
     });
     
@@ -690,11 +700,12 @@ function setupEventListeners() {
         try {
             await waitForCurrentRender();
             const dataUrl = exportCanvas.toDataURL("image/jpeg", 0.95);
-        
-        const link = document.createElement("a");
-        const safeName = state.payeeName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
-        link.download = `upi_qr_${safeName}.jpg`;
-        link.href = dataUrl;
+            const link = document.createElement("a");
+            const safeName = state.payeeName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+            const amt = parseFloat(state.amount);
+            const amtPart = Number.isFinite(amt) && amt > 0 ? `_${Math.floor(amt)}` : "";
+            link.download = `upi_qr_${safeName}${amtPart}.jpg`;
+            link.href = dataUrl;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -718,7 +729,9 @@ function setupEventListeners() {
             await waitForCurrentRender();
             const blob = await canvasToBlob(exportCanvas, "image/jpeg", 0.95);
             const safeName = state.payeeName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
-            const file = new File([blob], `upi_qr_${safeName}.jpg`, { type: "image/jpeg" });
+            const amt = parseFloat(state.amount);
+            const amtPart = Number.isFinite(amt) && amt > 0 ? `_${Math.floor(amt)}` : "";
+            const file = new File([blob], `upi_qr_${safeName}${amtPart}.jpg`, { type: "image/jpeg" });
                 
                 // Verify sharing capability in browser
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -732,7 +745,7 @@ function setupEventListeners() {
                     // Fallback to Clipboard copy + direct download
                     const copyDataUrl = exportCanvas.toDataURL("image/jpeg", 0.9);
                     
-                    // Trigger download download
+                    // Trigger download
                     const link = document.createElement("a");
                     link.download = `upi_qr_${safeName}.jpg`;
                     link.href = copyDataUrl;
@@ -753,6 +766,7 @@ function setupEventListeners() {
 // Initialization Entry Point
 // --------------------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
+    lucide.createIcons();
     loadSavedState();
     initHandleDropdown();
     setupEventListeners();

@@ -6,6 +6,10 @@
     <title>UPI QR</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <meta name="description" content="Generate and share premium, high-resolution UPI QR payment cards formatted in the Indian numbering system.">
+    <meta name="theme-color" content="#eef2f8">
+    <meta property="og:title" content="UPI QR — Instant Payment Card Generator">
+    <meta property="og:description" content="Generate and share high-resolution UPI QR payment cards. No data stored or transmitted.">
+    <meta property="og:type" content="website">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,7 +21,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="glow-bg"></div>
+    <div class="glow-bg" aria-hidden="true"></div>
     <div class="app-container">
         <!-- Header -->
         <header class="app-header animate-fade-in">
@@ -31,7 +35,7 @@
             <!-- Left: Controls Panel -->
             <section class="control-panel card glass animate-slide-up">
                 <div class="panel-heading">
-                    <h2 class="section-title"><i data-lucide="sliders" class="icon"></i> Card Details</h2>
+                    <h2 class="section-title"><i data-lucide="sliders" class="icon" aria-hidden="true"></i> QR Details</h2>
                     <button type="button" id="btn-more" class="more-button" aria-expanded="false" aria-controls="additional-options" aria-label="Show more options" title="More options">
                         <i data-lucide="more-horizontal" class="btn-icon"></i>
                     </button>
@@ -74,7 +78,7 @@
                         <div id="amount-input-container" class="amount-container">
                             <div class="input-wrapper amount-wrapper">
                                 <span class="currency-symbol">₹</span>
-                                <input type="text" id="amount" autocomplete="off" aria-describedby="amount-limit">
+                                <input type="text" id="amount" autocomplete="off" inputmode="decimal" aria-describedby="amount-limit">
                             </div>
                             <div class="formatted-amount-row">
                                 <span id="indian-formatted-amount" class="formatted-badge">₹ 0.00</span>
@@ -86,9 +90,12 @@
 
                     <!-- Note / Description -->
                     <div class="form-group">
-                        <label for="note">Transaction Note <span class="optional">(Optional)</span></label>
+                        <div class="label-row">
+                            <label for="note">Transaction Note <span class="optional">(Optional)</span></label>
+                            <span id="note-char-count" class="note-counter" aria-live="polite">0/25</span>
+                        </div>
                         <div class="input-wrapper">
-                            <i data-lucide="message-square" class="input-icon"></i>
+                            <i data-lucide="message-square" class="input-icon" aria-hidden="true"></i>
                             <input type="text" id="note" autocomplete="off" maxlength="25">
                         </div>
                     </div>
@@ -97,7 +104,7 @@
                     <div id="additional-options" class="additional-options" hidden>
                     <!-- Card Style Theme Picker -->
                     <div class="form-group">
-                        <label>Card Theme</label>
+                        <p class="field-label">QR Style</p>
                         <div class="theme-picker">
                             <button type="button" class="theme-btn active" data-theme="dark-metallic" style="background: linear-gradient(135deg, #14213d, #070d1b);">
                                 <span class="theme-name">Deep Navy</span>
@@ -118,7 +125,8 @@
             </section>
 
             <!-- Right: Preview & Output Panel -->
-            <section class="preview-panel animate-slide-up">
+            <section class="preview-panel animate-slide-up" aria-labelledby="preview-heading">
+                <h2 id="preview-heading" class="sr-only">Live Preview</h2>
                 <!-- Premium 3:4 Payment Card -->
                 <div class="payment-card-wrapper">
                     <canvas id="payment-card-canvas" width="600" height="800" role="img" aria-label="Preview of the generated UPI payment card"></canvas>
@@ -126,12 +134,12 @@
 
                 <!-- Action Triggers -->
                 <div class="action-buttons-group">
-                    <button id="btn-share" class="btn btn-primary">
-                        <i data-lucide="share-2" class="btn-icon"></i>
+                    <button id="btn-share" type="button" form="qr-form" class="btn btn-primary" aria-label="Share payment card">
+                        <i data-lucide="share-2" class="btn-icon" aria-hidden="true"></i>
                         Share Card
                     </button>
-                    <button id="btn-download" class="btn btn-secondary">
-                        <i data-lucide="download" class="btn-icon"></i>
+                    <button id="btn-download" type="button" form="qr-form" class="btn btn-secondary" aria-label="Download payment card as JPG">
+                        <i data-lucide="download" class="btn-icon" aria-hidden="true"></i>
                         Download JPG
                     </button>
                 </div>
@@ -141,11 +149,12 @@
         <!-- Footer -->
         <footer class="app-footer">
             <p>Made securely in Bharat. The UPI QR does not store or transmit any of your personal payment details; your last-used details stay only in this browser for reuse.</p>
+            <p class="footer-credit">Built by <span class="footer-author">SATYAM JAIN</span></p>
         </footer>
     </div>
 
     <!-- Hidden resolution canvas for high-quality export -->
-    <canvas id="export-canvas" width="1200" height="1600" style="display: none;"></canvas>
+    <canvas id="export-canvas" width="1200" height="1600" style="display: none;" aria-hidden="true"></canvas>
 
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
