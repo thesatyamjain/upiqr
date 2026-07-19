@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UPI QR</title>
-    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <meta name="description" content="Generate and share premium, high-resolution UPI QR payment cards formatted in the Indian numbering system.">
     <meta name="theme-color" content="#eef2f8">
     <meta property="og:title" content="UPI QR — Instant Payment Card Generator">
@@ -13,12 +13,13 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Icons (Lucide Icons via ESM) -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- QRCode library -->
-    <script src="qrcode.min.js"></script>
+    <script src="assets/qrcode.min.js"></script>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="assets/manifest.json">
 </head>
 <body>
     <div class="glow-bg" aria-hidden="true"></div>
@@ -26,7 +27,7 @@
         <!-- Header -->
         <header class="app-header animate-fade-in">
             <div class="logo">
-                <img src="favicon.svg" class="logo-icon" alt="" aria-hidden="true">
+                <img src="assets/favicon.svg" class="logo-icon" alt="" aria-hidden="true">
                 <h1><span class="gradient-text">UPI QR</span></h1>
             </div>
         </header>
@@ -36,9 +37,15 @@
             <section class="control-panel card glass animate-slide-up">
                 <div class="panel-heading">
                     <h2 class="section-title"><i data-lucide="sliders" class="icon" aria-hidden="true"></i> QR Details</h2>
-                    <button type="button" id="btn-more" class="more-button" aria-expanded="false" aria-controls="additional-options" aria-label="Show more options" title="More options">
-                        <i data-lucide="more-horizontal" class="btn-icon"></i>
-                    </button>
+                    <div class="panel-actions">
+                        <button type="button" id="btn-reset" class="reset-button" aria-label="Reset form fields" title="Reset / Clear form">
+                            <i data-lucide="rotate-ccw" class="btn-icon"></i>
+                            <span class="btn-text">Reset</span>
+                        </button>
+                        <button type="button" id="btn-more" class="more-button" aria-expanded="false" aria-controls="settings-modal" aria-label="Show more options" title="More options">
+                            <i data-lucide="more-horizontal" class="btn-icon"></i>
+                        </button>
+                    </div>
                 </div>
                 
                 <form id="qr-form" onsubmit="event.preventDefault();">
@@ -100,28 +107,102 @@
                         </div>
                     </div>
 
-                    <!-- Additional options -->
-                    <div id="additional-options" class="additional-options" hidden>
-                    <!-- Card Style Theme Picker -->
-                    <div class="form-group">
-                        <p class="field-label">QR Style</p>
-                        <div class="theme-picker">
-                            <button type="button" class="theme-btn active" data-theme="dark-metallic" style="background: linear-gradient(135deg, #14213d, #070d1b);">
-                                <span class="theme-name">Deep Navy</span>
-                            </button>
-                            <button type="button" class="theme-btn" data-theme="neon-violet" style="background: linear-gradient(135deg, #312e81, #7c3aed);">
-                                <span class="theme-name">Royal Violet</span>
-                            </button>
-                            <button type="button" class="theme-btn" data-theme="emerald-glow" style="background: linear-gradient(135deg, #0c5b4d, #18a982);">
-                                <span class="theme-name">Bharat Green</span>
-                            </button>
-                            <button type="button" class="theme-btn" data-theme="rose-gold" style="background: linear-gradient(135deg, #b54728, #f5a524);">
-                                <span class="theme-name">Saffron Glow</span>
-                            </button>
+                </form>
+            </section>
+
+            <!-- Settings Modal Pop-up -->
+            <div id="settings-modal" class="modal-backdrop" hidden aria-hidden="true" role="dialog" aria-labelledby="modal-title">
+                <div class="modal-card glass card">
+                    <div class="modal-header">
+                        <h3 id="modal-title" class="modal-title">
+                            <i data-lucide="sliders" class="icon" aria-hidden="true"></i> Card Options & Settings
+                        </h3>
+                        <button type="button" id="btn-close-modal" class="modal-close-btn" aria-label="Close settings">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="modal-body">
+                        <!-- Card Style Theme Picker -->
+                        <div class="form-group">
+                            <p class="field-label">QR Card Style</p>
+                            <div class="theme-picker">
+                                <button type="button" class="theme-btn active" data-theme="dark-metallic" style="background: linear-gradient(135deg, #14213d, #070d1b);">
+                                    <span class="theme-name">Deep Navy</span>
+                                </button>
+                                <button type="button" class="theme-btn" data-theme="neon-violet" style="background: linear-gradient(135deg, #312e81, #7c3aed);">
+                                    <span class="theme-name">Royal Violet</span>
+                                </button>
+                                <button type="button" class="theme-btn" data-theme="emerald-glow" style="background: linear-gradient(135deg, #0c5b4d, #18a982);">
+                                    <span class="theme-name">Bharat Green</span>
+                                </button>
+                                <button type="button" class="theme-btn" data-theme="rose-gold" style="background: linear-gradient(135deg, #b54728, #f5a524);">
+                                    <span class="theme-name">Saffron Glow</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- QR Center Badge Selector -->
+                        <div class="form-group" style="margin-top: 18px;">
+                            <p class="field-label">QR Center Badge</p>
+                            <div class="logo-picker logo-picker-two">
+                                <button type="button" class="logo-btn active" data-badge="none">
+                                    <span class="logo-badge-text">✕</span>
+                                    <span class="logo-name">None (Default)</span>
+                                </button>
+                                <button type="button" class="logo-btn" data-badge="custom">
+                                    <span class="logo-badge-text">🖼️</span>
+                                    <span class="logo-name">Custom Logo</span>
+                                </button>
+                            </div>
+                            <div id="custom-logo-container" class="custom-logo-container" hidden style="margin-top: 10px;">
+                                <label for="custom-logo-file" class="custom-logo-upload-btn">
+                                    <i data-lucide="upload" class="upload-icon"></i>
+                                    <span id="custom-logo-file-label">Upload Shop Logo</span>
+                                    <input type="file" id="custom-logo-file" accept="image/*" class="sr-only">
+                                </label>
+                                <button type="button" id="btn-remove-custom-logo" class="remove-logo-btn" hidden title="Remove custom logo">Clear Logo</button>
+                            </div>
+                        </div>
+
+                        <!-- Card Display Settings Toggles -->
+                        <div class="form-group" style="margin-top: 18px;">
+                            <p class="field-label">QR Card Display Settings</p>
+                            <div class="toggle-list">
+                                <label class="toggle-item">
+                                    <span class="toggle-label">Payee Name</span>
+                                    <input type="checkbox" id="toggle-payee-name" class="toggle-input" checked>
+                                    <span class="toggle-switch"></span>
+                                </label>
+                                <label class="toggle-item">
+                                    <span class="toggle-label">UPI ID (VPA)</span>
+                                    <input type="checkbox" id="toggle-vpa" class="toggle-input" checked>
+                                    <span class="toggle-switch"></span>
+                                </label>
+                                <label class="toggle-item">
+                                    <span class="toggle-label">Amount Pill</span>
+                                    <input type="checkbox" id="toggle-amount" class="toggle-input" checked>
+                                    <span class="toggle-switch"></span>
+                                </label>
+                                <label class="toggle-item">
+                                    <span class="toggle-label">Amount in Words</span>
+                                    <input type="checkbox" id="toggle-amount-words" class="toggle-input" checked>
+                                    <span class="toggle-switch"></span>
+                                </label>
+                                <label class="toggle-item">
+                                    <span class="toggle-label">Transaction Note</span>
+                                    <input type="checkbox" id="toggle-note" class="toggle-input" checked>
+                                    <span class="toggle-switch"></span>
+                                </label>
+                            </div>
                         </div>
                     </div>
+
+                    <div class="modal-footer">
+                        <button type="button" id="btn-done-modal" class="btn-primary-modal">Done</button>
                     </div>
-                </form>
+                </div>
+            </div>
             </section>
 
             <!-- Right: Preview & Output Panel -->
@@ -138,10 +219,27 @@
                         <i data-lucide="share-2" class="btn-icon" aria-hidden="true"></i>
                         Share Card
                     </button>
-                    <button id="btn-download" type="button" form="qr-form" class="btn btn-secondary" aria-label="Download payment card as JPG">
-                        <i data-lucide="download" class="btn-icon" aria-hidden="true"></i>
-                        Download JPG
-                    </button>
+                    <div class="download-dropdown-container">
+                        <div class="download-split-btn">
+                            <button id="btn-download" type="button" form="qr-form" class="btn btn-secondary btn-download-main" aria-label="Download payment card">
+                                <i data-lucide="download" class="btn-icon" aria-hidden="true"></i>
+                                <span id="download-btn-label">Download PNG</span>
+                            </button>
+                            <button id="btn-download-menu" type="button" class="btn btn-secondary btn-download-caret" aria-label="Choose download format" aria-expanded="false" aria-haspopup="true">
+                                <i data-lucide="chevron-down" class="btn-icon"></i>
+                            </button>
+                        </div>
+                        <div id="download-format-menu" class="download-menu-dropdown" hidden>
+                            <button type="button" class="download-menu-item" data-format="png">
+                                <span class="format-title">Download PNG</span>
+                                <span class="format-desc">Best quality for printing</span>
+                            </button>
+                            <button type="button" class="download-menu-item" data-format="jpg">
+                                <span class="format-title">Download JPG</span>
+                                <span class="format-desc">Smaller file size</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </section>
         </main>

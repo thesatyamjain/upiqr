@@ -2,18 +2,83 @@
  * THE UPI QR — Core Application Controller
  */
 
-// Config / Constant Data
-const BANK_HANDLES = [
-    { handle: "@okhdfcbank", bank: "HDFC Bank" },
-    { handle: "@okaxis", bank: "Axis Bank" },
-    { handle: "@okicici", bank: "ICICI Bank" },
-    { handle: "@oksbi", bank: "State Bank of India" },
-    { handle: "@paytm", bank: "Paytm Payments Bank" },
-    { handle: "@ybl", bank: "Yes Bank (PhonePe)" },
-    { handle: "@barodampay", bank: "Bank of Baroda" },
-    { handle: "@unionbank", bank: "Union Bank of India" },
-    { handle: "@upi", bank: "NPCI Universal" }
+// Categorized UPI Bank Handles grouped by App & Provider
+const BANK_HANDLE_CATEGORIES = [
+    {
+        category: "Google Pay (GPay)",
+        items: [
+            { handle: "@okhdfcbank", bank: "HDFC Bank (GPay)" },
+            { handle: "@okicici", bank: "ICICI Bank (GPay)" },
+            { handle: "@oksbi", bank: "State Bank of India (GPay)" },
+            { handle: "@okaxis", bank: "Axis Bank (GPay)" }
+        ]
+    },
+    {
+        category: "PhonePe",
+        items: [
+            { handle: "@ybl", bank: "Yes Bank (PhonePe)" },
+            { handle: "@ibl", bank: "ICICI Bank (PhonePe)" },
+            { handle: "@axl", bank: "Axis Bank (PhonePe)" }
+        ]
+    },
+    {
+        category: "Paytm",
+        items: [
+            { handle: "@paytm", bank: "Paytm Payments Bank" },
+            { handle: "@ptaxis", bank: "Axis Bank (Paytm)" },
+            { handle: "@pthdfc", bank: "HDFC Bank (Paytm)" },
+            { handle: "@ptsbi", bank: "SBI (Paytm)" },
+            { handle: "@pytm", bank: "Paytm VPA" }
+        ]
+    },
+    {
+        category: "BHIM & Major Banks",
+        items: [
+            { handle: "@upi", bank: "BHIM / NPCI Universal" },
+            { handle: "@sbi", bank: "State Bank of India" },
+            { handle: "@hdfcbank", bank: "HDFC Bank" },
+            { handle: "@icici", bank: "ICICI Bank" },
+            { handle: "@axisbank", bank: "Axis Bank" },
+            { handle: "@kotak", bank: "Kotak Mahindra Bank" },
+            { handle: "@barodampay", bank: "Bank of Baroda" },
+            { handle: "@pnb", bank: "Punjab National Bank" },
+            { handle: "@cnrb", bank: "Canara Bank" },
+            { handle: "@unionbank", bank: "Union Bank of India" },
+            { handle: "@indianbank", bank: "Indian Bank" },
+            { handle: "@indus", bank: "IndusInd Bank" },
+            { handle: "@federal", bank: "Federal Bank" },
+            { handle: "@idfcfirst", bank: "IDFC First Bank" },
+            { handle: "@rbl", bank: "RBL Bank" },
+            { handle: "@bandhan", bank: "Bandhan Bank" },
+            { handle: "@aupamb", bank: "AU Small Finance Bank" }
+        ]
+    },
+    {
+        category: "Amazon Pay",
+        items: [
+            { handle: "@apl", bank: "Amazon Pay (Axis Bank)" },
+            { handle: "@rapl", bank: "Amazon Pay (RBL Bank)" }
+        ]
+    },
+    {
+        category: "CRED & FinTech",
+        items: [
+            { handle: "@cred", bank: "CRED UPI (Axis Bank)" },
+            { handle: "@ikwik", bank: "MobiKwik" }
+        ]
+    },
+    {
+        category: "WhatsApp Pay",
+        items: [
+            { handle: "@waicici", bank: "WhatsApp Pay (ICICI)" },
+            { handle: "@wahdfcbank", bank: "WhatsApp Pay (HDFC)" },
+            { handle: "@wasbi", bank: "WhatsApp Pay (SBI)" },
+            { handle: "@waaxis", bank: "WhatsApp Pay (Axis)" }
+        ]
+    }
 ];
+
+const BANK_HANDLES = BANK_HANDLE_CATEGORIES.flatMap(cat => cat.items);
 
 // Theme configurations
 const THEMES = {
@@ -70,9 +135,18 @@ let state = {
     handle: "@okhdfcbank",
     amount: "",
     note: "",
-    theme: "dark-metallic"
+    theme: "dark-metallic",
+    exportFormat: "png",
+    qrBadge: "none",
+    customLogoDataUrl: "",
+    showPayeeName: true,
+    showVpa: true,
+    showAmount: true,
+    showAmountWords: true,
+    showNote: true
 };
 
+let customLogoImg = null;
 const STORAGE_KEY = "upi-qr-card-details-v1";
 const STANDARD_UPI_TRANSACTION_LIMIT = 100000;
 let renderVersion = 0;
@@ -92,7 +166,15 @@ function loadSavedState() {
             amount: typeof savedState.amount === "string" ? savedState.amount : state.amount,
             note: typeof savedState.note === "string" ? savedState.note : state.note,
             theme: THEMES[savedState.theme] ? savedState.theme : state.theme,
-            handle: savedHandleIsValid ? savedState.handle : state.handle
+            handle: savedHandleIsValid ? savedState.handle : state.handle,
+            exportFormat: savedState.exportFormat === "jpg" ? "jpg" : "png",
+            qrBadge: savedState.qrBadge === "custom" ? "custom" : "none",
+            customLogoDataUrl: typeof savedState.customLogoDataUrl === "string" ? savedState.customLogoDataUrl : "",
+            showPayeeName: typeof savedState.showPayeeName === "boolean" ? savedState.showPayeeName : state.showPayeeName,
+            showVpa: typeof savedState.showVpa === "boolean" ? savedState.showVpa : state.showVpa,
+            showAmount: typeof savedState.showAmount === "boolean" ? savedState.showAmount : state.showAmount,
+            showAmountWords: typeof savedState.showAmountWords === "boolean" ? savedState.showAmountWords : state.showAmountWords,
+            showNote: typeof savedState.showNote === "boolean" ? savedState.showNote : state.showNote
         };
     } catch (err) {
         // Storage can be unavailable in private browsing or blocked contexts.
@@ -108,7 +190,15 @@ function saveState() {
             handle: state.handle,
             amount: state.amount,
             note: state.note,
-            theme: state.theme
+            theme: state.theme,
+            exportFormat: state.exportFormat,
+            qrBadge: state.qrBadge,
+            customLogoDataUrl: state.customLogoDataUrl,
+            showPayeeName: state.showPayeeName,
+            showVpa: state.showVpa,
+            showAmount: state.showAmount,
+            showAmountWords: state.showAmountWords,
+            showNote: state.showNote
         }));
     } catch (err) {
         console.warn("UPI details could not be saved locally:", err);
@@ -128,10 +218,21 @@ const formattedAmountText = document.getElementById("indian-formatted-amount");
 const wordsAmountText = document.getElementById("indian-words-amount");
 const noteInput = document.getElementById("note");
 const themeButtons = document.querySelectorAll(".theme-btn");
+const logoButtons = document.querySelectorAll(".logo-btn");
+const togglePayeeName = document.getElementById("toggle-payee-name");
+const toggleVpa = document.getElementById("toggle-vpa");
+const toggleAmount = document.getElementById("toggle-amount");
+const toggleAmountWords = document.getElementById("toggle-amount-words");
+const toggleNote = document.getElementById("toggle-note");
+const btnReset = document.getElementById("btn-reset");
 const btnShare = document.getElementById("btn-share");
 const btnDownload = document.getElementById("btn-download");
+const btnDownloadMenu = document.getElementById("btn-download-menu");
+const downloadFormatMenu = document.getElementById("download-format-menu");
 const btnMore = document.getElementById("btn-more");
-const additionalOptions = document.getElementById("additional-options");
+const settingsModal = document.getElementById("settings-modal");
+const btnCloseModal = document.getElementById("btn-close-modal");
+const btnDoneModal = document.getElementById("btn-done-modal");
 const customSelectContainer = document.querySelector(".custom-select-container");
 
 // Toast Notification Function
@@ -213,6 +314,52 @@ function numberToIndianWords(value) {
     return words + " Only";
 }
 
+const HINDI_NUMBERS = [
+    "", "एक", "दो", "तीन", "चार", "पांच", "छह", "सात", "आठ", "नौ", "दस",
+    "ग्यारह", "बारह", "तेरह", "चौदह", "पंद्रह", "सोलह", "सत्रह", "अठारह", "उन्नीस", "बीस",
+    "इक्कीस", "बाईस", "तेईस", "चौबीस", "पच्चीस", "छब्बीस", "सत्ताईस", "अट्ठाईस", "उनतीस", "तीस",
+    "इकत्तीस", "बत्तीस", "तैंतीस", "चौंतीस", "पैंतीस", "छत्तीस", "सैंतीस", "अड़तीस", "उनतालीस", "चालीस",
+    "इकतालीस", "बयालीस", "तैंतालीस", "चौंतालीस", "पैंतालीस", "छियालीस", "सैंतालीस", "अड़तालीस", "उंचास", "पचास",
+    "इक्कावन", "बावन", "तिरेपन", "चौवन", "पचपन", "छप्पन", "सत्तावन", "अट्टावन", "उनसठ", "साठ",
+    "इकसठ", "बासठ", "तिरसठ", "चौंसठ", "पैंसठ", "छियासठ", "सरसठ", "अड़सठ", "उनहत्तर", "सत्तर",
+    "इकहत्तर", "बहत्तर", "तिहत्तर", "चौहत्तर", "पचहत्तर", "छिहत्तर", "सतहत्तर", "अठहत्तर", "उनासी", "अस्सी",
+    "इक्यासी", "बयासी", "तिरासी", "चौरासी", "पचासी", "छियासी", "सत्तासी", "अट्ठासी", "नवासी", "नब्बे",
+    "इक्यानवे", "बायानवे", "तिरानवे", "चौरानवे", "पचानवे", "छियानवे", "सत्तानवे", "अट्ठानवे", "निन्न्यानवे"
+];
+
+// Convert numbers to Hindi words in Indian numbering system
+function convertAmountHindi(n) {
+    if (n === 0) return "शून्य";
+    if (n < 100) return HINDI_NUMBERS[n];
+    if (n < 1000) return HINDI_NUMBERS[Math.floor(n / 100)] + " सौ" + (n % 100 !== 0 ? " " + convertAmountHindi(n % 100) : "");
+    if (n < 100000) return convertAmountHindi(Math.floor(n / 1000)) + " हज़ार" + (n % 1000 !== 0 ? " " + convertAmountHindi(n % 1000) : "");
+    if (n < 10000000) return convertAmountHindi(Math.floor(n / 100000)) + " लाख" + (n % 100000 !== 0 ? " " + convertAmountHindi(n % 100000) : "");
+    return convertAmountHindi(Math.floor(n / 10000000)) + " करोड़" + (n % 10000000 !== 0 ? " " + convertAmountHindi(n % 10000000) : "");
+}
+
+function numberToHindiWords(value) {
+    const cleanVal = parseFloat(value);
+    if (isNaN(cleanVal) || cleanVal === 0) return "शून्य रुपये मात्र";
+    if (cleanVal < 0) return "अमान्य राशि";
+    
+    const parts = cleanVal.toFixed(2).split('.');
+    const wholePart = parseInt(parts[0], 10);
+    const decimalPart = parseInt(parts[1], 10);
+    
+    let words = "";
+    if (wholePart > 0) {
+        words += convertAmountHindi(wholePart) + " रुपये";
+    } else {
+        words += "शून्य रुपये";
+    }
+    
+    if (decimalPart > 0) {
+        words += " और " + convertAmountHindi(decimalPart) + " पैसे";
+    }
+    
+    return words + " मात्र";
+}
+
 function formatIndianAmountInput(value) {
     if (!value) return "";
     const [wholePart, decimalPart] = value.split(".");
@@ -270,34 +417,41 @@ function buildUpiUri(data) {
 // --------------------------------------------------------------------------
 function initHandleDropdown() {
     handleSelectOptions.innerHTML = "";
-    BANK_HANDLES.forEach(item => {
-        const option = document.createElement("div");
-        option.className = "custom-option";
-        option.setAttribute("role", "option");
-        option.setAttribute("aria-selected", String(item.handle === state.handle));
-        if (item.handle === state.handle) option.classList.add("selected");
-        
-        option.innerHTML = `
-            <span class="option-handle">${item.handle}</span>
-            <span class="option-bank">${item.bank}</span>
-        `;
-        
-        option.addEventListener("click", () => {
-            state.handle = item.handle;
-            selectedHandleText.textContent = item.handle;
-            vpaPreviewText.textContent = state.username ? `${state.username}${state.handle}` : "—";
+    BANK_HANDLE_CATEGORIES.forEach(cat => {
+        const catHeader = document.createElement("div");
+        catHeader.className = "custom-select-category";
+        catHeader.textContent = cat.category;
+        handleSelectOptions.appendChild(catHeader);
+
+        cat.items.forEach(item => {
+            const option = document.createElement("div");
+            option.className = "custom-option";
+            option.setAttribute("role", "option");
+            option.setAttribute("aria-selected", String(item.handle === state.handle));
+            if (item.handle === state.handle) option.classList.add("selected");
             
-            // Highlight active selection
-            document.querySelectorAll(".custom-option").forEach(el => el.classList.remove("selected"));
-            document.querySelectorAll(".custom-option").forEach(el => el.setAttribute("aria-selected", "false"));
-            option.classList.add("selected");
-            option.setAttribute("aria-selected", "true");
+            option.innerHTML = `
+                <span class="option-handle">${item.handle}</span>
+                <span class="option-bank">${item.bank}</span>
+            `;
             
-            handleSelectContainerClose();
-            updateCard();
+            option.addEventListener("click", () => {
+                state.handle = item.handle;
+                selectedHandleText.textContent = item.handle;
+                vpaPreviewText.textContent = state.username ? `${state.username}${state.handle}` : "—";
+                
+                // Highlight active selection
+                document.querySelectorAll(".custom-option").forEach(el => el.classList.remove("selected"));
+                document.querySelectorAll(".custom-option").forEach(el => el.setAttribute("aria-selected", "false"));
+                option.classList.add("selected");
+                option.setAttribute("aria-selected", "true");
+                
+                handleSelectContainerClose();
+                updateCard();
+            });
+            
+            handleSelectOptions.appendChild(option);
         });
-        
-        handleSelectOptions.appendChild(option);
     });
 }
 
@@ -394,17 +548,16 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
     
-    // 4. Draw compact header
+    // 4. Draw compact header (Hindi primary, English secondary)
     ctx.save();
-    ctx.font = `800 ${22 * scale}px 'Outfit', sans-serif`;
+    ctx.font = `800 ${22 * scale}px 'Noto Sans Devanagari', 'Outfit', sans-serif`;
     ctx.fillStyle = theme.textMain;
-    ctx.letterSpacing = "1px";
     ctx.textAlign = "center";
-    ctx.fillText("UPI QR", w / 2, 44 * scale);
+    ctx.fillText("भुगतान के लिए स्कैन करें", w / 2, 44 * scale);
     
-    ctx.font = `600 ${10 * scale}px 'Inter', sans-serif`;
+    ctx.font = `600 ${9.5 * scale}px 'Inter', sans-serif`;
     ctx.fillStyle = theme.accent;
-    ctx.fillText("SCAN & PAY USING ANY UPI APP", w / 2, 65 * scale);
+    ctx.fillText("SCAN & PAY WITH ANY UPI APP", w / 2, 64 * scale);
     ctx.restore();
     
     // 5. Draw QR Code dynamic image representation
@@ -449,83 +602,134 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     ctx.drawImage(tempCanvas, qrImgX, qrImgY, qrSizePixel, qrSizePixel);
     ctx.restore();
 
+    // Draw Center Logo Badge on top of QR Code if enabled (custom logo)
+    if (data.qrBadge === "custom" && data.customLogoDataUrl) {
+        ctx.save();
+        const badgeSize = 54 * scale;
+        const badgeX = qrBoxX + (qrBoxSize - badgeSize) / 2;
+        const badgeY = qrBoxY + (qrBoxSize - badgeSize) / 2;
+
+        drawRoundedRect(ctx, badgeX, badgeY, badgeSize, badgeSize, 14 * scale);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.14)";
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+
+        if (!customLogoImg || customLogoImg.src !== data.customLogoDataUrl) {
+            customLogoImg = new Image();
+            customLogoImg.onload = () => updateCard();
+            customLogoImg.src = data.customLogoDataUrl;
+        }
+
+        if (customLogoImg && customLogoImg.complete && customLogoImg.naturalWidth > 0) {
+            ctx.save();
+            const innerPadding = 6 * scale;
+            const imgSize = badgeSize - innerPadding * 2;
+            const imgX = badgeX + innerPadding;
+            const imgY = badgeY + innerPadding;
+            
+            drawRoundedRect(ctx, imgX, imgY, imgSize, imgSize, 10 * scale);
+            ctx.clip();
+            ctx.drawImage(customLogoImg, imgX, imgY, imgSize, imgSize);
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
     
     // 6. Draw payee details directly beneath the QR code
     const infoYStart = qrBoxY + qrBoxSize + 108 * scale;
     const infoX = 70 * scale;
-    let contentBottom = infoYStart + 22 * scale;
+    let contentBottom = qrBoxY + qrBoxSize + 40 * scale;
     
-    ctx.save();
-    ctx.textAlign = "left";
+    const shouldShowName = Boolean(data.showPayeeName && data.payeeName && data.payeeName.trim());
+    const shouldShowVpa = Boolean(data.showVpa && data.username && data.username.trim());
+    
+    if (shouldShowName || shouldShowVpa) {
+        ctx.save();
+        ctx.textAlign = "left";
 
-    // A small label gives the payment details a clear visual hierarchy.
-    ctx.font = `700 ${10 * scale}px 'Inter', sans-serif`;
-    ctx.fillStyle = theme.textSub;
-    ctx.fillText("PAY TO", infoX, infoYStart - 32 * scale);
-    
-    // Draw Name
-    ctx.font = `700 ${24 * scale}px 'Outfit', sans-serif`;
-    ctx.fillStyle = theme.textMain;
-    if (data.payeeName) {
-        ctx.fillText(data.payeeName, infoX, infoYStart);
+        ctx.font = `700 ${11 * scale}px 'Noto Sans Devanagari', 'Inter', sans-serif`;
+        ctx.fillStyle = theme.textSub;
+        ctx.fillText("भुगतान प्राप्तकर्ता • PAYEE", infoX, infoYStart - 32 * scale);
+        
+        let currentY = infoYStart;
+
+        if (shouldShowName) {
+            ctx.font = `700 ${24 * scale}px 'Noto Sans Devanagari', 'Outfit', sans-serif`;
+            ctx.fillStyle = theme.textMain;
+            ctx.fillText(data.payeeName, infoX, currentY);
+        }
+        
+        if (shouldShowVpa) {
+            ctx.font = `500 ${14 * scale}px 'JetBrains Mono', monospace`;
+            ctx.fillStyle = theme.textSub;
+            const vpaY = shouldShowName ? currentY + 26 * scale : infoYStart;
+            ctx.fillText(vpa, infoX, vpaY);
+            currentY = vpaY;
+        }
+        
+        contentBottom = currentY + 22 * scale;
+        ctx.restore();
     }
     
-    // Draw VPA
-    ctx.font = `500 ${14 * scale}px 'JetBrains Mono', monospace`;
-    ctx.fillStyle = theme.textSub;
-    if (data.username) {
-        ctx.fillText(vpa, infoX, infoYStart + 26 * scale);
-    }
-    ctx.restore();
-    
-    // 8. Draw Amount if specified
-    if (Number.isFinite(Number.parseFloat(data.amount)) && Number.parseFloat(data.amount) > 0) {
-        const amountY = infoYStart + 90 * scale;
+    // 8. Draw Amount if specified and enabled
+    const hasValidAmount = Number.isFinite(Number.parseFloat(data.amount)) && Number.parseFloat(data.amount) > 0;
+    if (data.showAmount && hasValidAmount) {
+        const amountY = (shouldShowName || shouldShowVpa) ? (contentBottom + 45 * scale) : (infoYStart + 20 * scale);
         const formatted = formatIndianCurrency(data.amount);
-        const words = numberToIndianWords(data.amount);
+        const wordsHindi = numberToHindiWords(data.amount);
+        const wordsEnglish = numberToIndianWords(data.amount);
+        const showWords = data.showAmountWords;
         
         ctx.save();
         ctx.textAlign = "center";
         
-        // Custom background pill for amount
+        const pillWidth = w - 80 * scale;
+        const pillHeight = showWords ? 88 * scale : 52 * scale;
+        drawRoundedRect(ctx, 40 * scale, amountY - 28 * scale, pillWidth, pillHeight, 14 * scale);
         ctx.fillStyle = "rgba(255, 255, 255, 0.03)";
         ctx.strokeStyle = "rgba(255, 255, 255, 0.07)";
         ctx.lineWidth = 1 * scale;
-        const pillWidth = w - 80 * scale;
-        const pillHeight = 72 * scale;
-        drawRoundedRect(ctx, 40 * scale, amountY - 28 * scale, pillWidth, pillHeight, 14 * scale);
         ctx.fill();
         ctx.stroke();
         
-        // Draw amount text
         ctx.font = `800 ${30 * scale}px 'JetBrains Mono', monospace`;
         ctx.fillStyle = theme.accentLight;
-        ctx.fillText(formatted, w / 2, amountY + 8 * scale);
         
-        // Draw words text
-        ctx.font = `italic 500 ${9.5 * scale}px 'Inter', sans-serif`;
-        ctx.fillStyle = theme.textSub;
-        
-        // Truncate words text if too long
-        let wordsDisplay = words;
-        if (wordsDisplay.length > 55) {
-            wordsDisplay = wordsDisplay.slice(0, 52) + "...";
+        if (showWords) {
+            ctx.fillText(formatted, w / 2, amountY + 5 * scale);
+            
+            // Hindi Primary Words
+            ctx.font = `600 ${10.5 * scale}px 'Noto Sans Devanagari', sans-serif`;
+            ctx.fillStyle = theme.accentLight;
+            let hindiDisplay = wordsHindi.length > 55 ? wordsHindi.slice(0, 52) + "..." : wordsHindi;
+            ctx.fillText(hindiDisplay, w / 2, amountY + 29 * scale);
+
+            // English Secondary Words
+            ctx.font = `italic 500 ${8.5 * scale}px 'Inter', sans-serif`;
+            ctx.fillStyle = theme.textSub;
+            let engDisplay = wordsEnglish.length > 55 ? wordsEnglish.slice(0, 52) + "..." : wordsEnglish;
+            ctx.fillText(engDisplay, w / 2, amountY + 45 * scale);
+
+            contentBottom = amountY + 54 * scale;
+        } else {
+            ctx.fillText(formatted, w / 2, amountY + 6 * scale);
+            contentBottom = amountY + 24 * scale;
         }
-        ctx.fillText(wordsDisplay, w / 2, amountY + 33 * scale);
         ctx.restore();
-        contentBottom = amountY + 44 * scale;
     }
     
-    // 9. Draw Note / Description if present
+    // 9. Draw Note / Description if present and enabled
     let lastContentY = contentBottom;
-    if (data.note) {
+    if (data.showNote && data.note && data.note.trim()) {
         const noteY = contentBottom + 52 * scale;
         ctx.save();
         ctx.textAlign = "center";
-        ctx.font = `600 ${11 * scale}px 'Inter', sans-serif`;
-        ctx.fillStyle = "rgba(255, 255, 255, 0.28)";
-        ctx.letterSpacing = "0.5px";
-        ctx.fillText(`NOTE: "${data.note.toUpperCase()}"`, w / 2, noteY);
+        ctx.font = `600 ${11 * scale}px 'Noto Sans Devanagari', 'Inter', sans-serif`;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+        ctx.fillText(`विवरण (NOTE): "${data.note}"`, w / 2, noteY);
         ctx.restore();
         lastContentY = noteY;
     }
@@ -533,10 +737,9 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     // 10. Draw a minimal security stamp at the bottom
     ctx.save();
     ctx.textAlign = "center";
-    ctx.font = `600 ${9 * scale}px 'Inter', sans-serif`;
-    ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
-    ctx.letterSpacing = "1.5px";
-    ctx.fillText("POWERED BY NPCI UPI", w / 2,
+    ctx.font = `600 ${9.5 * scale}px 'Noto Sans Devanagari', 'Inter', sans-serif`;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
+    ctx.fillText("सभी UPI ऐप्स से भुगतान स्वीकार्य • POWERED BY NPCI UPI", w / 2,
         Math.min(Math.max(lastContentY + 48 * scale, h * 0.78), h - 28 * scale));
     ctx.restore();
 
@@ -619,7 +822,7 @@ function setupEventListeners() {
     
     // Perform initial formatting calculations
     formattedAmountText.textContent = formatIndianCurrency(state.amount);
-    wordsAmountText.textContent = numberToIndianWords(state.amount);
+    wordsAmountText.textContent = `${numberToHindiWords(state.amount)} (${numberToIndianWords(state.amount)})`;
     
     amountInput.addEventListener("input", (e) => {
         // Strip everything except numbers and a single dot
@@ -657,7 +860,7 @@ function setupEventListeners() {
         
         // Update labels
         formattedAmountText.textContent = formatIndianCurrency(cleanVal);
-        wordsAmountText.textContent = numberToIndianWords(cleanVal);
+        wordsAmountText.textContent = `${numberToHindiWords(cleanVal)} (${numberToIndianWords(cleanVal)})`;
         updateCard();
     });
     
@@ -683,11 +886,212 @@ function setupEventListeners() {
         });
     });
 
-    btnMore.addEventListener("click", () => {
-        const isExpanded = btnMore.getAttribute("aria-expanded") === "true";
-        btnMore.setAttribute("aria-expanded", String(!isExpanded));
-        additionalOptions.hidden = isExpanded;
+    // Card Display Settings visibility toggles
+    if (togglePayeeName) togglePayeeName.checked = state.showPayeeName;
+    if (toggleVpa) toggleVpa.checked = state.showVpa;
+    if (toggleAmount) toggleAmount.checked = state.showAmount;
+    if (toggleAmountWords) toggleAmountWords.checked = state.showAmountWords;
+    if (toggleNote) toggleNote.checked = state.showNote;
+
+    const bindToggle = (element, stateKey) => {
+        if (!element) return;
+        element.addEventListener("change", (e) => {
+            state[stateKey] = e.target.checked;
+            updateCard();
+        });
+    };
+
+    bindToggle(togglePayeeName, "showPayeeName");
+    bindToggle(toggleVpa, "showVpa");
+    bindToggle(toggleAmount, "showAmount");
+    bindToggle(toggleAmountWords, "showAmountWords");
+    bindToggle(toggleNote, "showNote");
+
+    function openModal() {
+        if (!settingsModal) return;
+        settingsModal.removeAttribute("hidden");
+        settingsModal.setAttribute("aria-hidden", "false");
+        btnMore.setAttribute("aria-expanded", "true");
+        document.body.style.overflow = "hidden";
+    }
+
+    function closeModal() {
+        if (!settingsModal) return;
+        settingsModal.setAttribute("hidden", "");
+        settingsModal.setAttribute("aria-hidden", "true");
+        btnMore.setAttribute("aria-expanded", "false");
+        document.body.style.overflow = "";
+    }
+
+    // Custom Logo File Uploader & Badge selector
+    const customLogoFile = document.getElementById("custom-logo-file");
+    const customLogoContainer = document.getElementById("custom-logo-container");
+    const customLogoFileLabel = document.getElementById("custom-logo-file-label");
+    const btnRemoveCustomLogo = document.getElementById("btn-remove-custom-logo");
+
+    const updateCustomLogoUI = () => {
+        const isCustom = state.qrBadge === "custom";
+        if (customLogoContainer) customLogoContainer.hidden = !isCustom;
+        if (customLogoFileLabel) {
+            customLogoFileLabel.textContent = state.customLogoDataUrl ? "Logo Uploaded ✔ (Change)" : "Upload Shop Logo";
+        }
+        if (btnRemoveCustomLogo) {
+            btnRemoveCustomLogo.hidden = !state.customLogoDataUrl;
+        }
+    };
+
+    updateCustomLogoUI();
+
+    logoButtons.forEach(btn => btn.classList.toggle("active", btn.dataset.badge === state.qrBadge));
+    logoButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            logoButtons.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            state.qrBadge = btn.dataset.badge;
+            updateCustomLogoUI();
+            saveState();
+            updateCard();
+        });
     });
+
+    if (customLogoFile) {
+        customLogoFile.addEventListener("change", (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) {
+                showToast("Image size must be under 5MB", "alert-triangle");
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                state.customLogoDataUrl = evt.target.result;
+                state.qrBadge = "custom";
+                logoButtons.forEach(btn => btn.classList.toggle("active", btn.dataset.badge === state.qrBadge));
+                updateCustomLogoUI();
+                saveState();
+                updateCard();
+                showToast("Custom shop logo applied!", "check-circle");
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    if (btnRemoveCustomLogo) {
+        btnRemoveCustomLogo.addEventListener("click", () => {
+            state.customLogoDataUrl = "";
+            state.qrBadge = "none";
+            if (customLogoFile) customLogoFile.value = "";
+            logoButtons.forEach(btn => btn.classList.toggle("active", btn.dataset.badge === state.qrBadge));
+            updateCustomLogoUI();
+            saveState();
+            updateCard();
+            showToast("Custom logo removed", "info");
+        });
+    }
+
+    // Reset Form button
+    if (btnReset) {
+        btnReset.addEventListener("click", () => {
+            state.payeeName = "";
+            state.username = "";
+            state.amount = "";
+            state.note = "";
+            state.theme = "dark-metallic";
+            state.qrBadge = "none";
+            state.customLogoDataUrl = "";
+            if (customLogoFile) customLogoFile.value = "";
+
+            payeeInput.value = "";
+            usernameInput.value = "";
+            amountInput.value = "";
+            noteInput.value = "";
+            
+            formattedAmountText.textContent = "₹ 0.00";
+            wordsAmountText.textContent = "शून्य रुपये मात्र (Zero Rupees Only)";
+            vpaPreviewText.textContent = "—";
+            const noteCounter = document.getElementById("note-char-count");
+            if (noteCounter) noteCounter.textContent = "0/25";
+
+            themeButtons.forEach(btn => btn.classList.toggle("active", btn.dataset.theme === state.theme));
+            logoButtons.forEach(btn => btn.classList.toggle("active", btn.dataset.badge === state.qrBadge));
+            updateCustomLogoUI();
+
+            saveState();
+            updateCard();
+            showToast("Form details reset!", "rotate-ccw");
+        });
+    }
+
+
+
+    btnMore.addEventListener("click", openModal);
+    if (btnCloseModal) btnCloseModal.addEventListener("click", closeModal);
+    if (btnDoneModal) btnDoneModal.addEventListener("click", closeModal);
+
+    if (settingsModal) {
+        settingsModal.addEventListener("click", (e) => {
+            if (e.target === settingsModal) {
+                closeModal();
+            }
+        });
+    }
+
+    window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && settingsModal && !settingsModal.hasAttribute("hidden")) {
+            closeModal();
+        }
+    });
+
+    // Download format dropdown menu handler
+    const menuItems = document.querySelectorAll(".download-menu-item");
+    const downloadBtnLabel = document.getElementById("download-btn-label");
+
+    const updateFormatUI = () => {
+        menuItems.forEach(item => {
+            const isActive = item.dataset.format === state.exportFormat;
+            item.classList.toggle("active", isActive);
+        });
+        if (downloadBtnLabel) {
+            downloadBtnLabel.textContent = `Download ${state.exportFormat.toUpperCase()}`;
+        }
+    };
+
+    updateFormatUI();
+
+    if (btnDownloadMenu && downloadFormatMenu) {
+        const toggleDownloadMenu = (e) => {
+            if (e) e.stopPropagation();
+            const isOpen = !downloadFormatMenu.hasAttribute("hidden");
+            if (isOpen) {
+                downloadFormatMenu.setAttribute("hidden", "");
+                btnDownloadMenu.setAttribute("aria-expanded", "false");
+            } else {
+                downloadFormatMenu.removeAttribute("hidden");
+                btnDownloadMenu.setAttribute("aria-expanded", "true");
+            }
+        };
+
+        btnDownloadMenu.addEventListener("click", toggleDownloadMenu);
+
+        window.addEventListener("click", (e) => {
+            if (!downloadFormatMenu.hasAttribute("hidden") && !downloadFormatMenu.contains(e.target) && e.target !== btnDownloadMenu) {
+                downloadFormatMenu.setAttribute("hidden", "");
+                btnDownloadMenu.setAttribute("aria-expanded", "false");
+            }
+        });
+
+        menuItems.forEach(item => {
+            item.addEventListener("click", (e) => {
+                e.stopPropagation();
+                state.exportFormat = item.dataset.format === "jpg" ? "jpg" : "png";
+                updateFormatUI();
+                saveState();
+                downloadFormatMenu.setAttribute("hidden", "");
+                btnDownloadMenu.setAttribute("aria-expanded", "false");
+                btnDownload.click();
+            });
+        });
+    }
     
     // Download action trigger
     btnDownload.addEventListener("click", async () => {
@@ -699,17 +1103,20 @@ function setupEventListeners() {
         const exportCanvas = document.getElementById("export-canvas");
         try {
             await waitForCurrentRender();
-            const dataUrl = exportCanvas.toDataURL("image/jpeg", 0.95);
+            const isPng = state.exportFormat === "png";
+            const mimeType = isPng ? "image/png" : "image/jpeg";
+            const ext = isPng ? "png" : "jpg";
+            const dataUrl = isPng ? exportCanvas.toDataURL("image/png") : exportCanvas.toDataURL("image/jpeg", 0.95);
             const link = document.createElement("a");
             const safeName = state.payeeName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
             const amt = parseFloat(state.amount);
             const amtPart = Number.isFinite(amt) && amt > 0 ? `_${Math.floor(amt)}` : "";
-            link.download = `upi_qr_${safeName}${amtPart}.jpg`;
+            link.download = `upi_qr_${safeName}${amtPart}.${ext}`;
             link.href = dataUrl;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            showToast("Payment card downloaded successfully!", "download");
+            showToast(`Payment card downloaded as ${ext.toUpperCase()}!`, "download");
         } catch (err) {
             console.error("Download failed:", err);
             showToast("Could not download the card. Please try again.", "alert-octagon");
@@ -727,13 +1134,16 @@ function setupEventListeners() {
         
         try {
             await waitForCurrentRender();
-            const blob = await canvasToBlob(exportCanvas, "image/jpeg", 0.95);
+            const isPng = state.exportFormat === "png";
+            const mimeType = isPng ? "image/png" : "image/jpeg";
+            const ext = isPng ? "png" : "jpg";
+            const blob = await canvasToBlob(exportCanvas, mimeType, isPng ? undefined : 0.95);
             const safeName = state.payeeName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
             const amt = parseFloat(state.amount);
             const amtPart = Number.isFinite(amt) && amt > 0 ? `_${Math.floor(amt)}` : "";
-            const file = new File([blob], `upi_qr_${safeName}${amtPart}.jpg`, { type: "image/jpeg" });
+            const file = new File([blob], `upi_qr_${safeName}${amtPart}.${ext}`, { type: mimeType });
                 
-                // Verify sharing capability in browser
+            // Verify sharing capability in browser
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
                     files: [file],
@@ -742,33 +1152,41 @@ function setupEventListeners() {
                 });
                 showToast("Card shared successfully!", "check-circle");
             } else {
-                    // Fallback to Clipboard copy + direct download
-                    const copyDataUrl = exportCanvas.toDataURL("image/jpeg", 0.9);
-                    
-                    // Trigger download
-                    const link = document.createElement("a");
-                    link.download = `upi_qr_${safeName}.jpg`;
-                    link.href = copyDataUrl;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
+                // Fallback to direct download
+                const link = document.createElement("a");
+                link.download = `upi_qr_${safeName}${amtPart}.${ext}`;
+                link.href = exportCanvas.toDataURL(mimeType, isPng ? undefined : 0.95);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
                     
                 showToast("Direct sharing unsupported. Card downloaded!", "alert-triangle");
             }
         } catch (err) {
-            console.error("Sharing failed: ", err);
-            showToast("Failed to share. Direct download active instead.", "alert-octagon");
+            console.error("Share failed:", err);
+            showToast("Could not share the card. Please try downloading instead.", "alert-octagon");
         }
     });
 }
 
 // --------------------------------------------------------------------------
-// Initialization Entry Point
+// Application Initialization
 // --------------------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
-    lucide.createIcons();
     loadSavedState();
     initHandleDropdown();
     setupEventListeners();
     updateCard();
+    if (window.lucide) {
+        window.lucide.createIcons();
+    }
 });
+
+// Register Offline Service Worker (PWA)
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(err => {
+            console.warn("Offline service worker registration failed:", err);
+        });
+    });
+}
