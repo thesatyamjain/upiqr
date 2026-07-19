@@ -548,23 +548,67 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
     
-    // 4. Draw compact header (Hindi primary, English secondary)
+    // 4. Bottom-Up Info Stacking & Dynamic QR Auto-Layout Algorithm
+    const { uri: upiString, vpa } = buildUpiUri(data);
+    const shouldShowName = Boolean(data.showPayeeName && data.payeeName && data.payeeName.trim());
+    const shouldShowVpa = Boolean(data.showVpa && data.username && data.username.trim());
+    const hasValidAmount = Number.isFinite(Number.parseFloat(data.amount)) && Number.parseFloat(data.amount) > 0;
+    const shouldShowAmount = Boolean(data.showAmount && hasValidAmount);
+    const shouldShowNote = Boolean(data.showNote && data.note && data.note.trim());
+
+    const footerY = h - 36 * scale;
+    let bottomStackTopY = footerY - 20 * scale;
+
+    // Calculate Note Position (Bottom-Up)
+    let noteY = 0;
+    if (shouldShowNote) {
+        noteY = bottomStackTopY - 4 * scale;
+        bottomStackTopY = noteY - 18 * scale;
+    }
+
+    // Calculate Amount Pill Position (Bottom-Up)
+    let amountY = 0;
+    let pillHeight = 0;
+    if (shouldShowAmount) {
+        pillHeight = data.showAmountWords ? 86 * scale : 50 * scale;
+        amountY = bottomStackTopY - pillHeight / 2 - 4 * scale;
+        bottomStackTopY = amountY - pillHeight / 2 - 18 * scale;
+    }
+
+    // Calculate Payee Details Position (Bottom-Up)
+    let infoYStart = 0;
+    let payeeBlockTop = bottomStackTopY;
+    if (shouldShowName || shouldShowVpa) {
+        const payeeTextHeight = (shouldShowName ? 30 * scale : 0) + (shouldShowVpa ? 22 * scale : 0);
+        infoYStart = bottomStackTopY - payeeTextHeight;
+        payeeBlockTop = infoYStart - 20 * scale;
+    }
+
+    // Position QR Code in available space between top margin (70px) and Info Block Top
+    const minTopMargin = 72 * scale;
+    const infoBlockTop = (shouldShowName || shouldShowVpa) ? payeeBlockTop : (shouldShowAmount ? (amountY - pillHeight / 2 - 16 * scale) : (shouldShowNote ? (noteY - 16 * scale) : bottomStackTopY));
+    const qrBoxSize = 314 * scale;
+    const availableUpperHeight = Math.max(qrBoxSize + 60 * scale, infoBlockTop - minTopMargin);
+    
+    // QR Code ranges gracefully from center to top of available upper space
+    const qrBoxY = Math.round(minTopMargin + (availableUpperHeight - qrBoxSize - 60 * scale) / 2 + 50 * scale);
+    const qrBoxX = (w - qrBoxSize) / 2;
+
+    // Draw compact header lines dynamically locked to qrBoxY to maintain constant 24px gap
+    const headerLine2Y = qrBoxY - 24 * scale;
+    const headerLine1Y = headerLine2Y - 20 * scale;
+
     ctx.save();
     ctx.font = `800 ${22 * scale}px 'Noto Sans Devanagari', 'Outfit', sans-serif`;
     ctx.fillStyle = theme.textMain;
     ctx.textAlign = "center";
-    ctx.fillText("भुगतान के लिए स्कैन करें", w / 2, 44 * scale);
+    ctx.fillText("भुगतान के लिए स्कैन करें", w / 2, headerLine1Y);
     
     ctx.font = `600 ${9.5 * scale}px 'Inter', sans-serif`;
     ctx.fillStyle = theme.accent;
-    ctx.fillText("SCAN & PAY WITH ANY UPI APP", w / 2, 64 * scale);
+    ctx.fillText("SCAN & PAY WITH ANY UPI APP", w / 2, headerLine2Y);
     ctx.restore();
-    
-    // 5. Draw QR Code dynamic image representation
-    // UPI payment URI string construction
-    // e.g. upi://pay?pa=username@handle&pn=PayeeName&am=Amount&tn=Note
-    const { uri: upiString, vpa } = buildUpiUri(data);
-    
+
     // Generate QR using temporary hidden canvas to get high quality data
     const tempCanvas = document.createElement("canvas");
     const qrSizePixel = 274 * scale;
@@ -585,11 +629,6 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
     });
 
     if (version !== renderVersion) return;
-    
-    // A single, generous high-contrast QR surface keeps the card easy to scan.
-    const qrBoxSize = 314 * scale;
-    const qrBoxX = (w - qrBoxSize) / 2;
-    const qrBoxY = 88 * scale;
     
     ctx.save();
     ctx.fillStyle = "#ffffff";
@@ -637,24 +676,17 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
         ctx.restore();
     }
 
-    
-    // 6. Draw payee details directly beneath the QR code
-    const infoYStart = qrBoxY + qrBoxSize + 108 * scale;
+    // 6. Draw payee details (bottom-up positioned)
     const infoX = 70 * scale;
-    let contentBottom = qrBoxY + qrBoxSize + 40 * scale;
-    
-    const shouldShowName = Boolean(data.showPayeeName && data.payeeName && data.payeeName.trim());
-    const shouldShowVpa = Boolean(data.showVpa && data.username && data.username.trim());
-    
     if (shouldShowName || shouldShowVpa) {
         ctx.save();
         ctx.textAlign = "left";
 
         ctx.font = `700 ${11 * scale}px 'Noto Sans Devanagari', 'Inter', sans-serif`;
         ctx.fillStyle = theme.textSub;
-        ctx.fillText("भुगतान प्राप्तकर्ता • PAYEE", infoX, infoYStart - 32 * scale);
+        ctx.fillText("भुगतान प्राप्तकर्ता • PAYEE", infoX, infoYStart - 18 * scale);
         
-        let currentY = infoYStart;
+        let currentY = infoYStart + 10 * scale;
 
         if (shouldShowName) {
             ctx.font = `700 ${24 * scale}px 'Noto Sans Devanagari', 'Outfit', sans-serif`;
@@ -665,19 +697,14 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
         if (shouldShowVpa) {
             ctx.font = `500 ${14 * scale}px 'JetBrains Mono', monospace`;
             ctx.fillStyle = theme.textSub;
-            const vpaY = shouldShowName ? currentY + 26 * scale : infoYStart;
+            const vpaY = shouldShowName ? currentY + 24 * scale : currentY;
             ctx.fillText(vpa, infoX, vpaY);
-            currentY = vpaY;
         }
-        
-        contentBottom = currentY + 22 * scale;
         ctx.restore();
     }
     
-    // 8. Draw Amount if specified and enabled
-    const hasValidAmount = Number.isFinite(Number.parseFloat(data.amount)) && Number.parseFloat(data.amount) > 0;
-    if (data.showAmount && hasValidAmount) {
-        const amountY = (shouldShowName || shouldShowVpa) ? (contentBottom + 45 * scale) : (infoYStart + 20 * scale);
+    // 8. Draw Amount Pill (bottom-up positioned)
+    if (shouldShowAmount) {
         const formatted = formatIndianCurrency(data.amount);
         const wordsHindi = numberToHindiWords(data.amount);
         const wordsEnglish = numberToIndianWords(data.amount);
@@ -687,8 +714,7 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
         ctx.textAlign = "center";
         
         const pillWidth = w - 80 * scale;
-        const pillHeight = showWords ? 88 * scale : 52 * scale;
-        drawRoundedRect(ctx, 40 * scale, amountY - 28 * scale, pillWidth, pillHeight, 14 * scale);
+        drawRoundedRect(ctx, 40 * scale, amountY - pillHeight / 2, pillWidth, pillHeight, 14 * scale);
         ctx.fillStyle = "rgba(255, 255, 255, 0.03)";
         ctx.strokeStyle = "rgba(255, 255, 255, 0.07)";
         ctx.lineWidth = 1 * scale;
@@ -699,48 +725,41 @@ async function renderCardOnCanvas(canvas, scale, data, version) {
         ctx.fillStyle = theme.accentLight;
         
         if (showWords) {
-            ctx.fillText(formatted, w / 2, amountY + 5 * scale);
+            ctx.fillText(formatted, w / 2, amountY - 12 * scale);
             
             // Hindi Primary Words
             ctx.font = `600 ${10.5 * scale}px 'Noto Sans Devanagari', sans-serif`;
             ctx.fillStyle = theme.accentLight;
             let hindiDisplay = wordsHindi.length > 55 ? wordsHindi.slice(0, 52) + "..." : wordsHindi;
-            ctx.fillText(hindiDisplay, w / 2, amountY + 29 * scale);
+            ctx.fillText(hindiDisplay, w / 2, amountY + 12 * scale);
 
             // English Secondary Words
             ctx.font = `italic 500 ${8.5 * scale}px 'Inter', sans-serif`;
             ctx.fillStyle = theme.textSub;
             let engDisplay = wordsEnglish.length > 55 ? wordsEnglish.slice(0, 52) + "..." : wordsEnglish;
-            ctx.fillText(engDisplay, w / 2, amountY + 45 * scale);
-
-            contentBottom = amountY + 54 * scale;
+            ctx.fillText(engDisplay, w / 2, amountY + 28 * scale);
         } else {
-            ctx.fillText(formatted, w / 2, amountY + 6 * scale);
-            contentBottom = amountY + 24 * scale;
+            ctx.fillText(formatted, w / 2, amountY + 8 * scale);
         }
         ctx.restore();
     }
     
-    // 9. Draw Note / Description if present and enabled
-    let lastContentY = contentBottom;
-    if (data.showNote && data.note && data.note.trim()) {
-        const noteY = contentBottom + 52 * scale;
+    // 9. Draw Note / Description (bottom-up positioned)
+    if (shouldShowNote) {
         ctx.save();
         ctx.textAlign = "center";
         ctx.font = `600 ${11 * scale}px 'Noto Sans Devanagari', 'Inter', sans-serif`;
-        ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+        ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
         ctx.fillText(`विवरण (NOTE): "${data.note}"`, w / 2, noteY);
         ctx.restore();
-        lastContentY = noteY;
     }
     
-    // 10. Draw a minimal security stamp at the bottom
+    // 10. Draw clean, fixed security stamp at the bottom of the card
     ctx.save();
     ctx.textAlign = "center";
-    ctx.font = `600 ${9.5 * scale}px 'Noto Sans Devanagari', 'Inter', sans-serif`;
-    ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
-    ctx.fillText("सभी UPI ऐप्स से भुगतान स्वीकार्य • POWERED BY NPCI UPI", w / 2,
-        Math.min(Math.max(lastContentY + 48 * scale, h * 0.78), h - 28 * scale));
+    ctx.font = `600 ${10.5 * scale}px 'Noto Sans Devanagari', 'Inter', sans-serif`;
+    ctx.fillStyle = theme.textSub;
+    ctx.fillText("सभी UPI ऐप्स से भुगतान स्वीकार्य • POWERED BY NPCI UPI", w / 2, footerY);
     ctx.restore();
 
     if (version !== renderVersion) return;
@@ -1083,14 +1102,24 @@ function setupEventListeners() {
         menuItems.forEach(item => {
             item.addEventListener("click", (e) => {
                 e.stopPropagation();
-                state.exportFormat = item.dataset.format === "jpg" ? "jpg" : "png";
-                updateFormatUI();
-                saveState();
                 downloadFormatMenu.setAttribute("hidden", "");
                 btnDownloadMenu.setAttribute("aria-expanded", "false");
-                btnDownload.click();
+
+                if (item.dataset.format === "qr-only") {
+                    downloadOnlyQrCode();
+                } else {
+                    state.exportFormat = item.dataset.format === "jpg" ? "jpg" : "png";
+                    updateFormatUI();
+                    saveState();
+                    btnDownload.click();
+                }
             });
         });
+    }
+
+    const btnDownloadQrOnly = document.getElementById("btn-download-qr-only");
+    if (btnDownloadQrOnly) {
+        btnDownloadQrOnly.addEventListener("click", downloadOnlyQrCode);
     }
     
     // Download action trigger
@@ -1116,12 +1145,95 @@ function setupEventListeners() {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            showToast(`Payment card downloaded as ${ext.toUpperCase()}!`, "download");
         } catch (err) {
             console.error("Download failed:", err);
             showToast("Could not download the card. Please try again.", "alert-octagon");
         }
     });
+
+    // Download Standalone QR Code Image Only
+    async function downloadOnlyQrCode() {
+        const validationError = getPaymentValidationError();
+        if (validationError) {
+            showToast(validationError, "alert-triangle");
+            return;
+        }
+
+        try {
+            const { uri: upiString } = buildUpiUri(state);
+            const qrCanvas = document.createElement("canvas");
+            const size = 1080;
+            qrCanvas.width = size;
+            qrCanvas.height = size;
+            const ctx = qrCanvas.getContext("2d");
+
+            // High-contrast clean white background
+            ctx.fillStyle = "#ffffff";
+            drawRoundedRect(ctx, 0, 0, size, size, 40);
+            ctx.fill();
+
+            // Render high-res QR code
+            const tempQr = document.createElement("canvas");
+            const qrPixel = 920;
+            await new Promise((resolve, reject) => {
+                QRCode.toCanvas(tempQr, upiString, {
+                    width: qrPixel,
+                    margin: 0,
+                    color: {
+                        dark: "#0f172a",
+                        light: "#ffffff"
+                    },
+                    errorCorrectionLevel: 'H'
+                }, (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                });
+            });
+
+            const qrPos = (size - qrPixel) / 2;
+            ctx.drawImage(tempQr, qrPos, qrPos, qrPixel, qrPixel);
+
+            // Draw custom logo badge in center if present
+            if (state.qrBadge === "custom" && state.customLogoDataUrl) {
+                const badgeSize = 180;
+                const badgePos = (size - badgeSize) / 2;
+
+                drawRoundedRect(ctx, badgePos, badgePos, badgeSize, badgeSize, 40);
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
+                ctx.strokeStyle = "rgba(0, 0, 0, 0.12)";
+                ctx.lineWidth = 6;
+                ctx.stroke();
+
+                if (customLogoImg && customLogoImg.complete && customLogoImg.naturalWidth > 0) {
+                    ctx.save();
+                    const innerPadding = 20;
+                    const imgSize = badgeSize - innerPadding * 2;
+                    const imgPos = badgePos + innerPadding;
+                    
+                    drawRoundedRect(ctx, imgPos, imgPos, imgSize, imgSize, 30);
+                    ctx.clip();
+                    ctx.drawImage(customLogoImg, imgPos, imgPos, imgSize, imgSize);
+                    ctx.restore();
+                }
+            }
+
+            const dataUrl = qrCanvas.toDataURL("image/png");
+            const link = document.createElement("a");
+            const safeName = (state.username || state.payeeName || "code").replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+            const amt = parseFloat(state.amount);
+            const amtPart = Number.isFinite(amt) && amt > 0 ? `_${Math.floor(amt)}` : "";
+            link.download = `upi_qr_code_${safeName}${amtPart}.png`;
+            link.href = dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("Standalone QR Code image downloaded!", "qr-code");
+        } catch (err) {
+            console.error("QR download failed:", err);
+            showToast("Could not download QR code image. Please try again.", "alert-octagon");
+        }
+    }
     
     // Share / Web Share Action trigger
     btnShare.addEventListener("click", async () => {
